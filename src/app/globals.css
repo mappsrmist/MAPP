@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f4f6fb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #eef1f8;
+  --muted-foreground: #5b6478;
+  --border: #dde3ef;
+  --input: #cfd7e6;
+  --primary: #12306b;
+  --primary-hover: #0c2250;
+  --primary-foreground: #ffffff;
+  --accent: #e3ebfb;
+  --accent-foreground: #12306b;
+  --destructive: #c2272d;
+  --success: #17803d;
+  --warning: #b45309;
+  --ring: #2a5bd7;
+}
+
+.dark {
+  --background: #0a1020;
+  --foreground: #e8ecf6;
+  --card: #111a2f;
+  --card-foreground: #e8ecf6;
+  --muted: #17223c;
+  --muted-foreground: #9aa6c0;
+  --border: #25314d;
+  --input: #2e3c5c;
+  --primary: #5b8cf5;
+  --primary-hover: #7aa2fa;
+  --primary-foreground: #08122b;
+  --accent: #1a2a4f;
+  --accent-foreground: #cfe0ff;
+  --destructive: #f0646a;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --ring: #5b8cf5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

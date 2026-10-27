@@ -1,0 +1,66 @@
+/** App-wide constants. Rules text and password formats are meant to be edited here. */
+
+export const PAGE_SIZE = 10;
+
+export const ADMIN_USERNAME = "mappCtech";
+export const ADMIN_EMAIL = "admin@mapp.local";
+export const STUDENT_EMAIL_DOMAIN = "students.mapp.local";
+
+/** Faculty initial password format (single place to change). Tokens: DD, MM, YYYY. */
+export const DOB_PASSWORD_FORMAT = "DDMMYYYY";
+
+export const CADRES = ["HOD", "ASSOC_CHAIR", "OTHER"] as const;
+export type Cadre = (typeof CADRES)[number];
+
+export const CADRE_LABEL: Record<Cadre, string> = {
+  HOD: "HOD",
+  ASSOC_CHAIR: "Associate Chair",
+  OTHER: "Faculty",
+};
+
+/** Mirrors public.cadre_seats() in the database (the DB is the source of truth). */
+export const CADRE_SEATS: Record<Cadre, number> = { HOD: 6, ASSOC_CHAIR: 4, OTHER: 8 };
+export const seatsForCadre = (c: Cadre) => CADRE_SEATS[c];
+export const batchesForCadre = (c: Cadre) => CADRE_SEATS[c] / 2;
+
+/** Explicit faculty columns for client queries: never select `dob` (it is the initial password). */
+export const FACULTY_COLS =
+  "id, emp_id, name, srm_email, designation, cadre, phone, venue, domains, total_seats, accepted_count, available_seats";
+
+export const MOOC_TITLE = "Rules and Regulations for MOOC Course Selection – 21CSP303T";
+
+export const MOOC_RULES: { title: string; text: string }[] = [
+  { title: "Approved Course Selection", text: "Students must select a MOOC course strictly from the official approved list provided by the MOOC coordinators." },
+  { title: "SWAYAM Course List", text: "The list of MOOC courses for January–May 2026 is yet to be released on the SWAYAM portal. Once available, students who have opted for MOOC can choose any one course from the official list provided by the MOOC coordinators." },
+  { title: "Course Relevance", text: "Students should choose a course that complements their existing knowledge and enhances their skills." },
+  { title: "Course Duration", text: "Each course must be completed within the prescribed duration of 12 weeks." },
+  { title: "Credits", text: "The MOOC course carries a weightage of 3 academic credits." },
+  { title: "Weekly Progress Monitoring", text: "Faculty will monitor students' attendance and progress weekly based on assessment completion." },
+  { title: "Assessments and Assignments", text: "Students must engage consistently with the course content and complete all assessments and assignments within the specified deadlines." },
+  { title: "Certification Submission", text: "After successfully completing the course, students must submit the certificate. The marks obtained will be recorded directly in the Academia portal." },
+  { title: "No Repetition of Completed Courses", text: "Students must not select a course already completed as a Professional Elective or Open Elective in the 4th, 5th, or 6th semester." },
+  { title: "No Future Elective Overlap", text: "Students must not select a course that they are scheduled to take as a Professional Elective or Open Elective in an upcoming semester." },
+  { title: "Failure to Complete the Course", text: "Students who fail the course must complete it in the subsequent semester to earn the required credits." },
+  { title: "Faculty Guidance", text: "Students should consult the faculty coordinator or academic advisor if they have any doubts regarding course selection or suitability." },
+  { title: "Mandatory Compliance", text: "Students must follow all the prescribed guidelines. Non-compliance may require them to retake the course to earn the required credits." },
+];
+
+export const MOOC_IMPORTANT =
+  "Students should wait for the official SWAYAM course list and select only one eligible course from the list approved by the MOOC coordinators.";
+
+/** Exact pop-up / message texts required by the spec. */
+export const MSG = {
+  FORCE_PASSWORD:
+    "For your security, you must change your password before proceeding. Please create a new, strong password to continue using the portal.",
+  MOOC_AGREE: "I agree to the rules and regulations and confirm that I am opting for the MOOC course.",
+  MOOC_SUCCESS: "You have successfully opted for the MOOC course.",
+  MINOR_LOCKED: "You have already opted for the MOOC course. The Minor Project dashboard is unavailable.",
+  MEET_FACULTY: "You can call / meet the faculty in person at their venue for approval.",
+} as const;
+
+export const PORTAL_HOME = {
+  student: "/student/mooc",
+  faculty: "/faculty/approached",
+  admin: "/admin",
+} as const;
+export type Role = keyof typeof PORTAL_HOME;
