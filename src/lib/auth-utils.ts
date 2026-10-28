@@ -9,11 +9,5 @@ export function usernameToEmail(role: Role, username: string): string | null {
   if (!u) return null;
   if (role === "student") return `${normalizeRegNo(u).toLowerCase()}@${STUDENT_EMAIL_DOMAIN}`;
   if (role === "faculty") return normalizeEmail(u);
-  if (role === "admin") {
-    const low = u.toLowerCase();
-    if (low === ADMIN_USERNAME.toLowerCase() || low === ADMIN_EMAIL.toLowerCase() || low === "admin") {
-      return ADMIN_EMAIL;
-    }
-  }
-  return null;
+  return u.toLowerCase() === ADMIN_USERNAME.toLowerCase() ? ADMIN_EMAIL : null;
 }

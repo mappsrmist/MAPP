@@ -117,7 +117,7 @@ export function PagedTable<T>({
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
               <tr>
                 {columns.map((c) => (
                   <th key={c.header} scope="col" className={cn("whitespace-nowrap px-4 py-3 font-medium", c.className)}>

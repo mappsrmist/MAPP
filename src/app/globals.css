@@ -3,23 +3,23 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f4f6fb;
-  --foreground: #0f172a;
+  --background: #f5f8f7;
+  --foreground: #243b39;
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  --muted: #eef1f8;
-  --muted-foreground: #5b6478;
-  --border: #dde3ef;
-  --input: #cfd7e6;
-  --primary: #12306b;
-  --primary-hover: #0c2250;
+  --card-foreground: #243b39;
+  --muted: #edf2f3;
+  --muted-foreground: #5c706e;
+  --border: #dce6e3;
+  --input: #bdceca;
+  --primary: #35665e;
+  --primary-hover: #28534c;
   --primary-foreground: #ffffff;
-  --accent: #e3ebfb;
-  --accent-foreground: #12306b;
+  --accent: #deece5;
+  --accent-foreground: #2f5c50;
   --destructive: #c2272d;
   --success: #17803d;
   --warning: #b45309;
-  --ring: #2a5bd7;
+  --ring: #4a7c75;
 }
 
 .dark {
@@ -68,6 +68,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  line-height: 1.6;
 }
 
 * {
@@ -77,4 +78,12 @@ body {
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

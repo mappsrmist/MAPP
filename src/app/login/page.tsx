@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const TABS: { role: Role; label: string; icon: React.ReactNode; userLabel: string; placeholder: string }[] = [
   { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration number", placeholder: "RA2411003010058" },
   { role: "faculty", label: "Faculty", icon: <Users className="h-4 w-4" />, userLabel: "SRM mail ID", placeholder: "name@srmist.edu.in" },
-  { role: "admin", label: "Admin", icon: <ShieldCheck className="h-4 w-4" />, userLabel: "Username", placeholder: "mappCtech" },
+  { role: "admin", label: "Admin", icon: <ShieldCheck className="h-4 w-4" />, userLabel: "Username", placeholder: "Admin username" },
 ];
 
 export default function LoginPage() {
@@ -58,15 +58,19 @@ export default function LoginPage() {
         <ThemeToggle />
       </div>
       <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
+        <div className="mb-7 flex items-center gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <GraduationCap className="h-7 w-7" aria-hidden />
           </span>
-          <h1 className="text-2xl font-bold tracking-tight">MAPP</h1>
-          <p className="text-sm text-muted-foreground">Minor and Major Project Allocation Portal</p>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">MAPP</h1>
+            <p className="max-w-64 text-sm text-muted-foreground">Minor and Major Project Allocation Portal</p>
+          </div>
         </div>
 
-        <Card className="p-6 shadow-lg">
+        <Card className="p-6 sm:p-8">
+          <h2 className="text-xl font-semibold tracking-tight">Sign in to your portal</h2>
+          <p className="mt-1 mb-6 text-sm text-muted-foreground">Choose your role and enter your college credentials.</p>
           <div role="tablist" aria-label="Sign in as" className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
             {TABS.map((t) => (
               <button
@@ -79,6 +83,7 @@ export default function LoginPage() {
                   setError(null);
                   setUsername("");
                   setPassword("");
+                  setShowPassword(false);
                 }}
                 className={cn(
                   "flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors",

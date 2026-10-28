@@ -44,6 +44,23 @@ Import the repo, set the three Supabase env vars (service-role key as a server-o
 - **Headers**: CSP (connections limited to this site and the project's own Supabase origin), HSTS, `X-Frame-Options: DENY`, `nosniff`, COOP/CORP, `noindex`. `script-src` keeps `'unsafe-inline'` because Next.js needs inline bootstrap scripts without per-request nonces; no user content is ever rendered as HTML.
 - Excel/CSV cells starting with `= + - @` are neutralised on export and in downloaded CSVs (formula-injection guard).
 
+### Security verification limits
+
+The application throttle protects the Next.js sign-in route. Supabase Auth is also directly
+reachable using the public project URL and anon key, so Supabase's own rate limits and attack
+protection remain necessary; the application throttle alone does not protect that endpoint.
+Forwarded IP headers are trustworthy only when the hosting proxy replaces client-supplied values.
+The origin check compares the complete request origin, including scheme and port; a reverse proxy
+must preserve the public request URL correctly.
+
+API JSON bodies are limited to 512 KiB while streaming, even without a Content-Length header.
+The security regression tests cover the actual size limit, origin validation, and shared admin
+throttle keys. Database tests cover role policies, RPC permissions and allocation rules.
+Passing tests or a clean dependency audit does not certify an application as vulnerability-free.
+Production Supabase settings, applied migrations, HTTPS, session expiry and secret management
+must also be verified in the deployed environment. The current CSP still allows inline scripts,
+as described above; a nonce-based CSP would provide additional protection.
+
 ## Architecture notes
 
 - **All invariants live in Postgres**: partial unique index `requests(student_id, project_type) WHERE status IN ('pending','accepted')`; `respond_request` locks the request and faculty rows; seats are derived from cadre by trigger; `batch_members.student_id` is unique and a trigger requires an accepted request with the batch's faculty.

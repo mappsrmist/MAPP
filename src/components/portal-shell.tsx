@@ -50,7 +50,7 @@ export function PortalShell({
         const active = pathname === item.href || pathname.startsWith(item.href + "/");
         const cls = cn(
           "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-          active ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground hover:bg-accent",
+          active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
         );
         if (item.lockedMessage) {
           return (
@@ -70,6 +70,16 @@ export function PortalShell({
     </nav>
   );
 
+  const account = (
+    <div className="m-3 mt-auto border-t px-1 pt-4 pb-1">
+      <p className="px-3 text-xs font-medium text-muted-foreground">Account</p>
+      <Button variant="ghost" className="mt-1 w-full justify-start text-muted-foreground" onClick={() => { setOpen(false); setPwOpen(true); }}>
+        <KeyRound className="h-4 w-4" aria-hidden />
+        Change password
+      </Button>
+    </div>
+  );
+
   const brand = (
     <div className="flex h-16 items-center gap-2 border-b px-5">
       <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -87,6 +97,7 @@ export function PortalShell({
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r bg-card lg:flex">
         {brand}
         {sidebar}
+        {account}
       </aside>
 
       {open && (
@@ -103,6 +114,7 @@ export function PortalShell({
               </Button>
             </div>
             {sidebar}
+            {account}
           </aside>
         </div>
       )}
@@ -111,25 +123,21 @@ export function PortalShell({
         <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="hidden min-w-0 lg:block" />
-        <div className="flex items-center gap-1 sm:gap-2">
-          <div className="mr-2 hidden text-right leading-tight sm:block">
+        <p className="hidden text-sm font-medium text-muted-foreground lg:block">{title}</p>
+        <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-3">
+          <div className="mr-2 min-w-0 border-r pr-4 text-right leading-tight">
             <p className="max-w-[16rem] truncate text-sm font-medium">{userName}</p>
-            {userSub && <p className="text-xs text-muted-foreground">{userSub}</p>}
+            {userSub && <p className="max-w-[16rem] truncate text-xs text-muted-foreground">{userSub}</p>}
           </div>
           <ThemeToggle />
-          <Button variant="ghost" size="sm" onClick={() => setPwOpen(true)}>
-            <KeyRound className="h-4 w-4" />
-            <span className="hidden sm:inline">Password</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={logout}>
+          <Button variant="ghost" size="sm" aria-label="Sign out" onClick={logout}>
             <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Logout</span>
+            <span className="hidden sm:inline">Sign out</span>
           </Button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl p-4 lg:p-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">{children}</main>
 
       <Dialog open={pwOpen} onOpenChange={setPwOpen}>
         <DialogContent title="Change password" description="Enter your current password and choose a new one.">

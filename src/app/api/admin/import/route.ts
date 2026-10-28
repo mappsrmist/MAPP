@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bodyTooLarge, isSameOrigin } from "@/lib/server/origin";
+import { bodyTooLarge, isSameOrigin, readJsonBody } from "@/lib/server/origin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/server/guards";
 import { upsertFaculty, upsertStudent, type Upserted } from "@/lib/server/importers";
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!(await requireAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = importRequestSchema.safeParse(await request.json().catch(() => null));
+  const body = importRequestSchema.safeParse(await readJsonBody(request));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0].message }, { status: 400 });
   const { type, rows, offset } = body.data;
 
