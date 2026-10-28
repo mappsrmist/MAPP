@@ -7,11 +7,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, PageHeader } from "@/components/ui/card";
 import { ConfirmDialog, MessageDialog } from "@/components/ui/dialog";
+import { useGlobalFreeze } from "@/components/freeze";
 import { MOOC_IMPORTANT, MOOC_RULES, MOOC_TITLE, MSG } from "@/lib/config";
 import { createClient } from "@/lib/supabase/client";
 
 export function MoocClient({ choice }: { choice: "mooc" | "minor" | null }) {
   const router = useRouter();
+  const frozen = useGlobalFreeze();
   const [agree, setAgree] = React.useState(false);
   const [confirm, setConfirm] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
@@ -79,7 +81,7 @@ export function MoocClient({ choice }: { choice: "mooc" | "minor" | null }) {
                 <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-[var(--primary)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
                 <span>{MSG.MOOC_AGREE}</span>
               </label>
-              <Button disabled={!agree} onClick={() => setConfirm(true)}>
+              <Button disabled={!agree || frozen} title={frozen ? MSG.FROZEN_TIP : undefined} onClick={() => setConfirm(true)}>
                 Submit
               </Button>
             </div>

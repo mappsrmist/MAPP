@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, StatusBadge } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { PagedTable } from "@/components/paged-table";
-import { PAGE_SIZE } from "@/lib/config";
+import { APPROACHED_HEADERS as H, MSG, PAGE_SIZE } from "@/lib/config";
 import { exportTable, safeFilePart } from "@/lib/excel";
 import { cleanSearch } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
@@ -16,9 +16,10 @@ import { useFaculty } from "../faculty-context";
 
 export function ApproachedClient() {
   const supabase = React.useMemo(() => createClient(), []);
-  const { faculty, tick, bump } = useFaculty();
+  const { faculty, tick, bump, frozen } = useFaculty();
   const [action, setAction] = React.useState<{ row: RequestDetail; status: "accepted" | "declined" } | null>(null);
   const full = faculty.available_seats <= 0;
+  const locked = (r: RequestDetail) => (frozen ? MSG.FROZEN_TIP : r.status === "pending" && full ? "No seats available" : undefined);
 
   async function respond() {
     if (!action) return;
@@ -81,7 +82,7 @@ export function ApproachedClient() {
         emptyTitle="No requests yet"
         emptyHint="Students who request you will appear here."
         onError={(m) => toast.error(m)}
-        fetchPage={async (page, search) => {
+        fetchPage={async (page, search, signal) => {
           let q = supabase
             .from("request_details_v")
             .select("*", { count: "exact" })
@@ -91,20 +92,20 @@ export function ApproachedClient() {
             .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
           const term = cleanSearch(search);
           if (term) q = q.or(`reg_no.ilike.%${term}%,student_name.ilike.%${term}%`);
-          const { data, count, error } = await q;
+          const { data, count, error } = await q.abortSignal(signal);
           if (error) throw new Error(error.message);
           return { rows: (data ?? []) as RequestDetail[], total: count ?? 0 };
         }}
         columns={[
-          { header: "Registration Number", cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
-          { header: "Student Name", cell: (r) => <span className="font-medium">{r.student_name}</span> },
-          { header: "Dept", cell: (r) => r.dept },
-          { header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
+          { header: H[0], cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
+          { header: H[1], cell: (r) => <span className="font-medium">{r.student_name}</span> },
+          { header: H[2], cell: (r) => r.student_section ?? "—" },
+          { header: H[3], cell: (r) => <StatusBadge status={r.status} /> },
           {
-            header: "Accept",
+            header: H[4],
             cell: (r) =>
               r.status === "pending" ? (
-                <Button size="sm" variant="success" disabled={full} title={full ? "No seats available" : undefined} onClick={() => setAction({ row: r, status: "accepted" })}>
+                <Button size="sm" variant="success" disabled={full || frozen} title={locked(r)} onClick={() => setAction({ row: r, status: "accepted" })}>
                   <Check className="h-3.5 w-3.5" />
                   Accept
                 </Button>
@@ -113,10 +114,10 @@ export function ApproachedClient() {
               ),
           },
           {
-            header: "Decline",
+            header: H[5],
             cell: (r) =>
               r.status === "pending" ? (
-                <Button size="sm" variant="destructive" onClick={() => setAction({ row: r, status: "declined" })}>
+                <Button size="sm" variant="destructive" disabled={frozen} title={frozen ? MSG.FROZEN_TIP : undefined} onClick={() => setAction({ row: r, status: "declined" })}>
                   <X className="h-3.5 w-3.5" />
                   Decline
                 </Button>

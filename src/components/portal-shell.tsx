@@ -2,14 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { GraduationCap, KeyRound, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, MessageDialog } from "@/components/ui/dialog";
+import { FreezeProvider } from "@/components/freeze";
 import { ThemeToggle } from "@/components/theme";
-import { ChangePasswordForm } from "@/components/change-password-form";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+
+const ChangePasswordForm = dynamic(
+  () => import("@/components/change-password-form").then((mod) => mod.ChangePasswordForm),
+  { loading: () => <p role="status" className="text-sm text-muted-foreground">Loading account settings…</p> },
+);
 
 export interface NavItem {
   href: string;
@@ -24,12 +30,15 @@ export function PortalShell({
   userName,
   userSub,
   nav,
+  frozen = false,
   children,
 }: {
   title: string;
   userName: string;
   userSub?: string;
   nav: NavItem[];
+  /** The admin's global freeze flag at render time (kept live on the client). */
+  frozen?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -137,11 +146,13 @@ export function PortalShell({
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <FreezeProvider initial={frozen}>{children}</FreezeProvider>
+      </main>
 
       <Dialog open={pwOpen} onOpenChange={setPwOpen}>
         <DialogContent title="Change password" description="Enter your current password and choose a new one.">
-          <ChangePasswordForm onDone={() => setPwOpen(false)} />
+          {pwOpen && <ChangePasswordForm onDone={() => setPwOpen(false)} />}
         </DialogContent>
       </Dialog>
       <MessageDialog open={locked !== null} onOpenChange={(o) => !o && setLocked(null)} title="Unavailable" message={locked ?? ""} />

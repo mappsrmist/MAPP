@@ -1,17 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Download, KeyRound, RotateCcw, UserMinus } from "lucide-react";
+import { Download, KeyRound, RotateCcw, Snowflake } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge, Card, PageHeader, Skeleton, StatusBadge } from "@/components/ui/card";
-import { ConfirmDialog, Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Badge, Card, PageHeader, Skeleton } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { PagedTable } from "@/components/paged-table";
 import { CADRE_LABEL, FACULTY_COLS, PAGE_SIZE } from "@/lib/config";
+import { fetchAll } from "@/lib/fetch-all";
 import { exportTable } from "@/lib/excel";
 import { cleanSearch, useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
-import type { FacultyRow, RequestDetail, StudentRow } from "@/lib/types";
+import type { FacultyRow, StudentRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface Stats {
@@ -26,32 +27,19 @@ interface Stats {
   filled_seats: number;
 }
 
-type TabKey = "mooc" | "none" | "faculty" | "alloc";
+type TabKey = "mooc" | "none" | "faculty";
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "alloc", label: "Allocations" },
   { key: "faculty", label: "Faculty & seats" },
   { key: "mooc", label: "MOOC opted" },
   { key: "none", label: "No choice yet" },
 ];
 
-/** Pulls every row of a (possibly large) query, 1000 at a time, for Excel exports. */
-async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await build(from, from + 999);
-    if (error) throw new Error(error.message);
-    out.push(...(data ?? []));
-    if (!data || data.length < 1000) return out;
-  }
-}
-
 export function OverviewClient() {
   const supabase = React.useMemo(() => createClient(), []);
   const [stats, setStats] = React.useState<Stats | null>(null);
-  const [tab, setTab] = React.useState<TabKey>("alloc");
-  const [issued, setIssued] = React.useState<null | { username: string; password: string }>(null);
+  const [tab, setTab] = React.useState<TabKey>("faculty");
   const [refresh, setRefresh] = React.useState(0);
-  const [confirm, setConfirm] = React.useState<null | { title: string; description: string; label: string; run: () => Promise<void> }>(null);
+  const [confirm, setConfirm] = React.useState<null | { title: string; description: string; label: string; destructive?: boolean; run: () => Promise<void> }>(null);
 
   const loadStats = React.useCallback(async () => {
     const { data, error } = await supabase.rpc("admin_stats");
@@ -82,34 +70,19 @@ export function OverviewClient() {
       body: JSON.stringify({ profileId }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.ok) setIssued({ username: json.username, password: json.password });
+    if (res.ok) toast.success(`Password reset. ${json.username} signs in with their ${json.role === "student" ? "registration number" : "employee ID"} and must choose a new password.`);
     else toast.error(json.error ?? "Could not reset password");
   }
 
   const askReset = (id: string, who: string) =>
     setConfirm({
       title: `Reset password for ${who}?`,
-      description: "A new random one-time password is generated and shown to you once. The user must choose their own password at next login.",
+      description: "The password goes back to the initial one (registration number for students, employee ID for faculty). The user must choose a new password at next login.",
       label: "Reset password",
       run: () => resetPassword(id),
     });
 
   // ---------------------------------------------------------------- exports
-  async function exportAllocations() {
-    const rows = await fetchAll<RequestDetail>((f, t) =>
-      supabase.from("request_details_v").select("*").eq("status", "accepted").order("faculty_name").order("batch_no").order("slot").range(f, t),
-    );
-    await exportTable("MAPP_Allocations.xlsx", "Allocations", [
-      { header: "Faculty Emp ID", key: "fe", width: 16 },
-      { header: "Faculty", key: "fn", width: 28 },
-      { header: "Batch", key: "b", width: 12 },
-      { header: "Registration No.", key: "r", width: 22 },
-      { header: "Student", key: "s", width: 28 },
-      { header: "Dept", key: "d", width: 14 },
-      { header: "Section", key: "sec", width: 10 },
-    ], rows.map((r) => ({ fe: r.faculty_emp_id, fn: r.faculty_name, b: r.batch_no ? `B${r.batch_no}` : "Unassigned", r: r.reg_no, s: r.student_name, d: r.dept, sec: r.student_section ?? "" })));
-  }
-
   async function exportStudents(kind: "mooc" | "none") {
     const rows = await fetchAll<StudentRow>((f, t) => {
       let q = supabase.from("students").select("*").order("reg_no").range(f, t);
@@ -144,12 +117,9 @@ export function OverviewClient() {
     <>
       <PageHeader
         title="Overview"
-        description="Live status of allocations across the portal."
+        description="Live status across the portal. Allocations and freeze controls have their own pages."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => run(exportAllocations())}>
-              <Download className="h-4 w-4" /> Allocations
-            </Button>
             <Button variant="outline" size="sm" onClick={() => run(exportStudents("mooc"))}>
               <Download className="h-4 w-4" /> MOOC list
             </Button>
@@ -185,58 +155,6 @@ export function OverviewClient() {
         ))}
       </div>
 
-      {tab === "alloc" && (
-        <PagedTable<RequestDetail>
-          key="alloc"
-          rowKey={(r) => r.id}
-          refreshKey={refresh}
-          searchPlaceholder="Search student or faculty"
-          emptyTitle="No allocations yet"
-          onError={(m) => toast.error(m)}
-          fetchPage={async (page, search) => {
-            let q = supabase
-              .from("request_details_v")
-              .select("*", { count: "exact" })
-              .eq("status", "accepted")
-              .order("faculty_name")
-              .order("batch_no", { nullsFirst: false })
-              .order("slot")
-              .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-            const term = cleanSearch(search);
-            if (term) q = q.or(`reg_no.ilike.%${term}%,student_name.ilike.%${term}%,faculty_name.ilike.%${term}%,faculty_emp_id.ilike.%${term}%`);
-            const { data, count, error } = await q;
-            if (error) throw new Error(error.message);
-            return { rows: (data ?? []) as RequestDetail[], total: count ?? 0 };
-          }}
-          columns={[
-            { header: "Faculty", cell: (r) => (<><span className="font-medium">{r.faculty_name}</span><span className="block font-mono text-xs text-muted-foreground">{r.faculty_emp_id}</span></>) },
-            { header: "Batch", cell: (r) => (r.batch_no ? <Badge tone="info">B{r.batch_no}</Badge> : <Badge>Unassigned</Badge>) },
-            { header: "Student", cell: (r) => (<><span className="font-medium">{r.student_name}</span><span className="block font-mono text-xs text-muted-foreground">{r.reg_no}</span></>) },
-            { header: "Dept", cell: (r) => r.dept },
-            { header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
-            {
-              header: "Action",
-              cell: (r) => (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setConfirm({
-                      title: `Remove ${r.student_name} from ${r.faculty_name}?`,
-                      description: "This frees the faculty's seat and unlocks the student's Minor portal.",
-                      label: "Remove",
-                      run: () => rpc("admin_remove_accepted", { p_request_id: r.id }, "Allocation removed"),
-                    })
-                  }
-                >
-                  <UserMinus className="h-3.5 w-3.5" /> Remove
-                </Button>
-              ),
-            },
-          ]}
-        />
-      )}
-
       {tab === "faculty" && (
         <PagedTable<FacultyRow>
           key="faculty"
@@ -244,11 +162,11 @@ export function OverviewClient() {
           refreshKey={refresh}
           searchPlaceholder="Search by name or employee ID"
           onError={(m) => toast.error(m)}
-          fetchPage={async (page, search) => {
+          fetchPage={async (page, search, signal) => {
             let q = supabase.from("faculty").select(FACULTY_COLS, { count: "exact" }).order("name").range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
             const term = cleanSearch(search);
             if (term) q = q.or(`name.ilike.%${term}%,emp_id.ilike.%${term}%`);
-            const { data, count, error } = await q;
+            const { data, count, error } = await q.abortSignal(signal);
             if (error) throw new Error(error.message);
             return { rows: (data ?? []) as unknown as FacultyRow[], total: count ?? 0 };
           }}
@@ -258,6 +176,29 @@ export function OverviewClient() {
             { header: "Cadre", cell: (r) => CADRE_LABEL[r.cadre] },
             { header: "Filled", cell: (r) => r.accepted_count },
             { header: "Available", cell: (r) => <Badge tone={r.available_seats > 0 ? "success" : "danger"}>{r.available_seats} / {r.total_seats}</Badge> },
+            {
+              header: "Freeze",
+              cell: (r) => (
+                <Button
+                  size="sm"
+                  variant={r.frozen ? "default" : "outline"}
+                  aria-pressed={r.frozen}
+                  onClick={() =>
+                    setConfirm({
+                      title: r.frozen ? `Unfreeze ${r.name}?` : `Freeze ${r.name}?`,
+                      description: r.frozen
+                        ? "This faculty can accept, decline and group students again."
+                        : "This faculty can no longer accept, decline, group, ungroup or edit batches. They can still view and download.",
+                      label: r.frozen ? "Unfreeze" : "Freeze",
+                      destructive: !r.frozen,
+                      run: () => rpc("admin_set_faculty_freeze", { p_faculty: r.id, p_frozen: !r.frozen }, r.frozen ? "Faculty unfrozen" : "Faculty frozen"),
+                    })
+                  }
+                >
+                  <Snowflake className="h-3.5 w-3.5" /> {r.frozen ? "Frozen" : "Freeze"}
+                </Button>
+              ),
+            },
             {
               header: "Password",
               cell: (r) => (
@@ -278,12 +219,12 @@ export function OverviewClient() {
           searchPlaceholder="Search by registration number or name"
           emptyTitle={tab === "mooc" ? "No MOOC selections yet" : "Everyone has made a choice"}
           onError={(m) => toast.error(m)}
-          fetchPage={async (page, search) => {
+          fetchPage={async (page, search, signal) => {
             let q = supabase.from("students").select("*", { count: "exact" }).order("reg_no").range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
             q = tab === "mooc" ? q.eq("choice", "mooc") : q.is("choice", null);
             const term = cleanSearch(search);
             if (term) q = q.or(`reg_no.ilike.%${term}%,name.ilike.%${term}%`);
-            const { data, count, error } = await q;
+            const { data, count, error } = await q.abortSignal(signal);
             if (error) throw new Error(error.message);
             return { rows: (data ?? []) as StudentRow[], total: count ?? 0 };
           }}
@@ -322,37 +263,13 @@ export function OverviewClient() {
         />
       )}
 
-      <Dialog open={issued !== null} onOpenChange={(o) => !o && setIssued(null)}>
-        <DialogContent title="One-time password" description="Shown only once and not stored. Share it privately with the user." className="max-w-md">
-          <dl className="space-y-2 text-sm">
-            <div>
-              <dt className="text-muted-foreground">Username</dt>
-              <dd className="break-all font-mono">{issued?.username}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Password</dt>
-              <dd className="select-all rounded-lg bg-muted px-3 py-2 font-mono text-base tracking-wide">{issued?.password}</dd>
-            </div>
-          </dl>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => issued && navigator.clipboard.writeText(issued.password).then(() => toast.success("Copied"), () => toast.error("Could not copy"))}
-            >
-              Copy password
-            </Button>
-            <Button onClick={() => setIssued(null)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <ConfirmDialog
         open={!!confirm}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={confirm?.title ?? ""}
         description={confirm?.description}
         confirmLabel={confirm?.label}
-        destructive
+        destructive={confirm?.destructive ?? true}
         onConfirm={() => confirm?.run()}
       />
     </>

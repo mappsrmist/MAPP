@@ -20,9 +20,12 @@ export const CADRE_SEATS: Record<Cadre, number> = { HOD: 6, ASSOC_CHAIR: 4, OTHE
 export const seatsForCadre = (c: Cadre) => CADRE_SEATS[c];
 export const batchesForCadre = (c: Cadre) => CADRE_SEATS[c] / 2;
 
+/** Column headers of the faculty "Students Approached" table (Section replaced Dept). */
+export const APPROACHED_HEADERS = ["Reg No", "Name", "Section", "Status", "Accept", "Decline"] as const;
+
 /** Explicit faculty columns for client queries. */
 export const FACULTY_COLS =
-  "id, emp_id, name, srm_email, designation, cadre, phone, venue, domains, total_seats, accepted_count, available_seats";
+  "id, emp_id, name, srm_email, designation, cadre, phone, venue, domains, total_seats, accepted_count, available_seats, frozen";
 
 export const MOOC_TITLE = "Rules and Regulations for MOOC Course Selection – 21CSP303T";
 
@@ -53,7 +56,33 @@ export const MSG = {
   MOOC_SUCCESS: "You have successfully opted for the MOOC course.",
   MINOR_LOCKED: "You have already opted for the MOOC course. The Minor Project dashboard is unavailable.",
   MEET_FACULTY: "You can call / meet the faculty in person at their venue for approval.",
+  APPLICATION_LOCKED: "The Application Form opens only after your guide accepts your request.",
+  FROZEN: "Allocations are frozen by the admin",
+  FROZEN_HINT: "Requests, responses, batches and applications cannot be changed. You can still view and download everything.",
+  FROZEN_FACULTY: "Your allocations are frozen by the admin",
+  FROZEN_TIP: "Allocations are frozen by the admin",
 } as const;
+
+/** The 17 official UN Sustainable Development Goals (suggestions for the application form). */
+export const SDG_GOALS = [
+  "1. No Poverty",
+  "2. Zero Hunger",
+  "3. Good Health and Well-being",
+  "4. Quality Education",
+  "5. Gender Equality",
+  "6. Clean Water and Sanitation",
+  "7. Affordable and Clean Energy",
+  "8. Decent Work and Economic Growth",
+  "9. Industry, Innovation and Infrastructure",
+  "10. Reduced Inequalities",
+  "11. Sustainable Cities and Communities",
+  "12. Responsible Consumption and Production",
+  "13. Climate Action",
+  "14. Life Below Water",
+  "15. Life on Land",
+  "16. Peace, Justice and Strong Institutions",
+  "17. Partnerships for the Goals",
+] as const;
 
 export const PORTAL_HOME = {
   student: "/student/mooc",

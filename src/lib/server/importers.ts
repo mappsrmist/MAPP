@@ -1,7 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STUDENT_EMAIL_DOMAIN } from "@/lib/config";
-import { generatePassword } from "@/lib/server/passwords";
 import type { FacultyImportRow, StudentRow } from "@/lib/validators";
 
 type Admin = SupabaseClient;
@@ -9,18 +8,17 @@ type Role = "student" | "faculty";
 
 export interface Upserted {
   created: boolean;
-  /** One-time password; only present for newly created accounts. */
-  password?: string;
 }
 
 /**
- * Creates the auth user + profile for a username with a random one-time password, or returns the
- * existing profile id (idempotent: existing accounts and their passwords are never touched).
+ * Creates the auth user + profile for a username, or returns the existing profile id (idempotent:
+ * existing accounts and their passwords are never touched). The initial password is the registration
+ * number (students) or employee ID (faculty); `must_change_password` forces a new one at first login.
  */
 async function ensureUser(
   admin: Admin,
-  opts: { role: Role; username: string; email: string },
-): Promise<{ id: string; created: boolean; password?: string }> {
+  opts: { role: Role; username: string; email: string; initialPassword: string },
+): Promise<{ id: string; created: boolean }> {
   const { data: existing, error: lookupErr } = await admin
     .from("profiles")
     .select("id, role")
@@ -33,8 +31,7 @@ async function ensureUser(
     return { id: existing.id, created: false };
   }
 
-  const password = generatePassword();
-  const { data, error } = await admin.auth.admin.createUser({ email: opts.email, password, email_confirm: true });
+  const { data, error } = await admin.auth.admin.createUser({ email: opts.email, password: opts.initialPassword, email_confirm: true });
   if (error || !data.user) throw new Error("Could not create the account (is the email already in use?)");
 
   const { error: profileErr } = await admin
@@ -44,7 +41,7 @@ async function ensureUser(
     await admin.auth.admin.deleteUser(data.user.id); // keep auth + profiles consistent
     throw new Error("Could not create the account");
   }
-  return { id: data.user.id, created: true, password };
+  return { id: data.user.id, created: true };
 }
 
 async function rollbackIfNew(admin: Admin, id: string, created: boolean) {
@@ -52,9 +49,10 @@ async function rollbackIfNew(admin: Admin, id: string, created: boolean) {
 }
 
 export async function upsertStudent(admin: Admin, row: StudentRow): Promise<Upserted> {
-  const { id, created, password } = await ensureUser(admin, {
+  const { id, created } = await ensureUser(admin, {
     role: "student",
     username: row.reg_no,
+    initialPassword: row.reg_no,
     email: `${row.reg_no.toLowerCase()}@${STUDENT_EMAIL_DOMAIN}`,
   });
   const { error } = await admin.from("students").upsert(
@@ -65,13 +63,14 @@ export async function upsertStudent(admin: Admin, row: StudentRow): Promise<Upse
     await rollbackIfNew(admin, id, created);
     throw new Error("Could not save the student (duplicate registration number?)");
   }
-  return { created, password };
+  return { created };
 }
 
 export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promise<Upserted> {
-  const { id, created, password } = await ensureUser(admin, {
+  const { id, created } = await ensureUser(admin, {
     role: "faculty",
     username: row.srm_email,
+    initialPassword: row.emp_id,
     email: row.srm_email,
   });
   const { error } = await admin.from("faculty").upsert(
@@ -92,5 +91,5 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
     await rollbackIfNew(admin, id, created);
     throw new Error("Could not save the faculty member (duplicate employee ID or email?)");
   }
-  return { created, password };
+  return { created };
 }

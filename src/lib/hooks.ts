@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { createRefreshBatcher } from "@/lib/request-control";
 
 export function useDebounced<T>(value: T, ms = 300): T {
   const [v, setV] = useState(value);
@@ -25,16 +26,22 @@ export function useRealtime(tables: { table: string; filter?: string }[], onChan
 
   useEffect(() => {
     const supabase = createClient();
+    const refresh = createRefreshBatcher(() => {
+      if (document.visibilityState === "visible") cb.current();
+    });
     const list = JSON.parse(key) as { table: string; filter?: string }[];
     let channel = supabase.channel(`rt-${Math.random().toString(36).slice(2)}`);
     list.forEach(({ table, filter }) => {
-      channel = channel.on("postgres_changes", { event: "*", schema: "public", table, ...(filter ? { filter } : {}) }, () => cb.current());
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table, ...(filter ? { filter } : {}) }, refresh.schedule);
     });
     channel.subscribe();
-    const onFocus = () => cb.current();
+    const onFocus = () => refresh.schedule();
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      refresh.cancel();
       supabase.removeChannel(channel);
     };
   }, [key]);

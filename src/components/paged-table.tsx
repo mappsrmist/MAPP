@@ -8,6 +8,7 @@ import { Card, EmptyState, Skeleton } from "@/components/ui/card";
 import { PAGE_SIZE } from "@/lib/config";
 import { useDebounced } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { createRequestGate } from "@/lib/request-control";
 
 export interface Column<T> {
   header: string;
@@ -18,7 +19,7 @@ export interface Column<T> {
 interface Props<T> {
   columns: Column<T>[];
   /** Server-side page fetch (page is 1-based). Called again whenever page/search/deps/refreshKey change. */
-  fetchPage: (page: number, search: string) => Promise<{ rows: T[]; total: number }>;
+  fetchPage: (page: number, search: string, signal: AbortSignal) => Promise<{ rows: T[]; total: number }>;
   rowKey: (row: T) => string;
   searchPlaceholder?: string;
   /** Extra controls (e.g. a filter dropdown) shown next to the search box. */
@@ -59,34 +60,42 @@ export function PagedTable<T>({
   const [state, setState] = React.useState<{ rows: T[]; total: number } | null>(null);
   const fetchRef = React.useRef(fetchPage);
   const errRef = React.useRef(onError);
+  const [requests] = React.useState(createRequestGate);
   React.useEffect(() => {
     fetchRef.current = fetchPage;
     errRef.current = onError;
   });
 
   const load = React.useCallback(
-    async () => {
+    async (background = false) => {
+      const request = requests.start(background);
+      if (!request) return;
       try {
-        const res = await fetchRef.current(page, debounced);
+        const res = await fetchRef.current(page, debounced, request.signal);
+        if (!request.isCurrent()) return;
         const lastPage = Math.max(1, Math.ceil(res.total / PAGE_SIZE));
         if (page > lastPage) setPageState({ key: filterKey, page: lastPage });
         else setState(res);
       } catch (e) {
+        if (!request.isCurrent()) return;
         errRef.current?.(e instanceof Error ? e.message : "Could not load data");
         setState((s) => s ?? { rows: [], total: 0 });
+      } finally {
+        request.finish();
       }
     },
-    [page, debounced, filterKey],
+    [page, debounced, filterKey, requests],
   );
 
   React.useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+    return () => requests.cancel();
+  }, [load, refreshKey, requests]);
 
   React.useEffect(() => {
     if (!pollMs) return;
     // background tabs do not poll: keeps database load proportional to people actually looking
-    const t = setInterval(() => document.visibilityState === "visible" && void load(), pollMs);
+    const t = setInterval(() => document.visibilityState === "visible" && void load(true), pollMs);
     return () => clearInterval(t);
   }, [pollMs, load]);
 

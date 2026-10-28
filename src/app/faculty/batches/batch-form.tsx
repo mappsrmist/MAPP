@@ -6,83 +6,99 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog, Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/form";
+import { MSG } from "@/lib/config";
 import { batchFormSchema } from "@/lib/validators";
 import { createClient } from "@/lib/supabase/client";
-import type { BatchRow, RequestDetail } from "@/lib/types";
+import type { BatchRow, FacultyRow, RequestDetail } from "@/lib/types";
 
 type In = z.input<typeof batchFormSchema>;
 type Out = z.output<typeof batchFormSchema>;
+type Slot = "m1" | "m2";
 
+/**
+ * Group (or edit) one batch. Each of the two students has their own Section, Faculty Advisor Name, Contact Number
+ * and SRM Mail ID; the advisor / contact / mail are prefilled from the faculty's profile and stay editable.
+ */
 export function BatchFormDialog({
   batchNo,
   existing,
   options,
-  facultyName,
+  faculty,
+  frozen,
   onClose,
   onSaved,
 }: {
   batchNo: number;
   existing: BatchRow | null;
   options: RequestDetail[];
-  facultyName: string;
+  faculty: FacultyRow;
+  frozen: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const supabase = React.useMemo(() => createClient(), []);
   const members = existing ? [...existing.batch_members].sort((a, b) => a.slot - b.slot) : [];
-  const [confirmClear, setConfirmClear] = React.useState(false);
+  const byId = new Map(options.map((o) => [o.student_id, o]));
+
+  const blank = (i: number) => ({
+    student: members[i]?.student_id ?? "",
+    section: members[i]?.section ?? "",
+    advisor: members[i]?.advisor_name ?? faculty.name,
+    contact: members[i]?.contact_number ?? faculty.phone ?? "",
+    mail: members[i]?.srm_mail ?? faculty.srm_email,
+  });
 
   const {
     control,
     register,
+    setValue,
+    getValues,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<In, unknown, Out>({
     resolver: zodResolver(batchFormSchema),
-    defaultValues: {
-      student1: members[0]?.student_id ?? "",
-      student2: members[1]?.student_id ?? "",
-      section: existing?.section ?? "",
-      advisor: existing?.advisor_name ?? facultyName,
-      contact: existing?.contact_number ?? "",
-      mail: existing?.srm_mail ?? "",
-    },
+    defaultValues: { m1: blank(0), m2: blank(1) },
   });
 
-  const s1 = useWatch({ control, name: "student1" }) ?? "";
-  const s2 = useWatch({ control, name: "student2" }) ?? "";
-  const byId = new Map(options.map((o) => [o.student_id, o]));
+  const s1 = useWatch({ control, name: "m1.student" }) ?? "";
+  const s2 = useWatch({ control, name: "m2.student" }) ?? "";
 
   async function onSubmit(v: Out) {
     const { error } = await supabase.rpc("save_batch", {
       p_batch_no: batchNo,
-      p_student1: v.student1,
-      p_student2: v.student2,
-      p_section: v.section,
-      p_advisor: v.advisor,
-      p_contact: v.contact,
-      p_mail: v.mail,
+      p_members: [v.m1, v.m2].map((m) => ({
+        student_id: m.student,
+        section: m.section,
+        advisor_name: m.advisor,
+        contact_number: m.contact,
+        srm_mail: m.mail,
+      })),
     });
     if (error) return void toast.error(error.message);
-    toast.success(`Batch ${batchNo} saved`);
+    toast.success(existing ? `Batch ${batchNo} updated` : `Batch ${batchNo} grouped`);
     onSaved();
   }
 
-  async function clear() {
-    const { error } = await supabase.rpc("clear_batch", { p_batch_no: batchNo });
-    if (error) return void toast.error(error.message);
-    toast.success(`Batch ${batchNo} cleared`);
-    onSaved();
-  }
-
-  const studentSelect = (name: "student1" | "student2", label: string, other: string) => {
-    const picked = byId.get(name === "student1" ? s1 : s2);
+  const block = (slot: Slot, label: string, other: string) => {
+    const e = errors[slot];
+    const picked = byId.get(slot === "m1" ? s1 : s2);
+    const pick = register(`${slot}.student`);
     return (
-      <div className="rounded-lg border p-3">
-        <Field label={label} htmlFor={name} error={errors[name]?.message}>
-          <Select id={name} {...register(name)}>
+      <fieldset className="rounded-lg border p-3" disabled={frozen}>
+        <legend className="px-1 text-sm font-semibold">{label}</legend>
+        <Field label="Student" htmlFor={`${slot}-student`} error={e?.student?.message}>
+          <Select
+            id={`${slot}-student`}
+            {...pick}
+            onChange={(ev) => {
+              void pick.onChange(ev);
+              // a freshly chosen student brings their own section unless one was already typed
+              const st = byId.get(ev.target.value);
+              if (st?.student_section && !getValues(`${slot}.section`)) setValue(`${slot}.section`, st.student_section);
+            }}
+          >
             <option value="">Select a student…</option>
             {options
               .filter((o) => o.student_id !== other)
@@ -97,61 +113,50 @@ export function BatchFormDialog({
           <Input aria-label={`${label} name`} readOnly tabIndex={-1} value={picked?.student_name ?? ""} placeholder="Name" className="bg-muted" />
           <Input aria-label={`${label} registration number`} readOnly tabIndex={-1} value={picked?.reg_no ?? ""} placeholder="Registration No." className="bg-muted" />
         </div>
-      </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label="Section" htmlFor={`${slot}-section`} error={e?.section?.message}>
+            <Input id={`${slot}-section`} maxLength={20} {...register(`${slot}.section`)} />
+          </Field>
+          <Field label="Faculty Advisor Name" htmlFor={`${slot}-advisor`} error={e?.advisor?.message}>
+            <Input id={`${slot}-advisor`} maxLength={100} {...register(`${slot}.advisor`)} />
+          </Field>
+          <Field label="Contact Number" htmlFor={`${slot}-contact`} error={e?.contact?.message}>
+            <Input id={`${slot}-contact`} inputMode="tel" {...register(`${slot}.contact`)} />
+          </Field>
+          <Field label="SRM Mail ID" htmlFor={`${slot}-mail`} error={e?.mail?.message}>
+            <Input id={`${slot}-mail`} type="email" {...register(`${slot}.mail`)} />
+          </Field>
+        </div>
+      </fieldset>
     );
   };
 
   return (
-    <>
-      <Dialog open onOpenChange={(o) => !o && onClose()}>
-        <DialogContent title={`Batch ${batchNo}`} description="Choose two students you have accepted, then fill in the batch details." className="max-w-xl">
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-            {options.length < 2 && (
-              <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
-                You need at least two accepted students who are not already in a batch.
-              </p>
-            )}
-            {studentSelect("student1", "Student 1", s2)}
-            {studentSelect("student2", "Student 2", s1)}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Section" htmlFor="section" error={errors.section?.message}>
-                <Input id="section" {...register("section")} />
-              </Field>
-              <Field label="Faculty Advisor Name" htmlFor="advisor" error={errors.advisor?.message}>
-                <Input id="advisor" {...register("advisor")} />
-              </Field>
-              <Field label="Contact Number" htmlFor="contact" error={errors.contact?.message}>
-                <Input id="contact" inputMode="tel" {...register("contact")} />
-              </Field>
-              <Field label="SRM Mail ID" htmlFor="mail" error={errors.mail?.message}>
-                <Input id="mail" type="email" {...register("mail")} />
-              </Field>
-            </div>
-            <DialogFooter>
-              {existing && (
-                <Button type="button" variant="destructive" className="sm:mr-auto" onClick={() => setConfirmClear(true)}>
-                  Clear batch
-                </Button>
-              )}
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" loading={isSubmitting}>
-                Group
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <ConfirmDialog
-        open={confirmClear}
-        onOpenChange={setConfirmClear}
-        title={`Clear Batch ${batchNo}?`}
-        description="Both students become unassigned. You can group them again later."
-        confirmLabel="Clear batch"
-        destructive
-        onConfirm={clear}
-      />
-    </>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title={`${existing ? "Edit" : "Group"} Batch ${batchNo}`}
+        description="Choose two students you have accepted. Each student has their own section, advisor, contact and mail."
+        className="max-h-[90vh] max-w-2xl overflow-y-auto"
+      >
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+          {frozen && <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">{MSG.FROZEN_HINT}</p>}
+          {options.length < 2 && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+              You need at least two accepted students who are not already in a batch.
+            </p>
+          )}
+          {block("m1", "Student 1", s2)}
+          {block("m2", "Student 2", s1)}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={isSubmitting} disabled={frozen} title={frozen ? MSG.FROZEN_TIP : undefined}>
+              {existing ? "Save changes" : "Group"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -12,15 +12,9 @@ interface RowError {
   message: string;
 }
 
-interface Credential {
-  username: string;
-  name: string;
-  password: string;
-}
-
 /**
  * Imports one chunk (<=100 rows) of students or faculty. The client sends the CSV in chunks.
- * New accounts get a random one-time password, returned once in `credentials` and never stored.
+ * New accounts start with the registration number / employee ID as password and must change it at first login.
  */
 export async function POST(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -32,17 +26,12 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const errors: RowError[] = [];
-  const credentials: Credential[] = [];
   let created = 0;
   let updated = 0;
 
-  const record = (res: Upserted, username: string, name: string) => {
-    if (res.created && res.password) {
-      created++;
-      credentials.push({ username, name, password: res.password });
-    } else {
-      updated++;
-    }
+  const record = (res: Upserted) => {
+    if (res.created) created++;
+    else updated++;
   };
 
   const work = rows.map((raw, i) => async () => {
@@ -51,11 +40,11 @@ export async function POST(request: Request) {
       if (type === "students") {
         const r = studentRowSchema.safeParse(raw);
         if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
-        record(await upsertStudent(admin, r.data), r.data.reg_no, r.data.name);
+        record(await upsertStudent(admin, r.data));
       } else {
         const r = facultyRowSchema.safeParse(raw);
         if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
-        record(await upsertFaculty(admin, r.data), r.data.srm_email, r.data.name);
+        record(await upsertFaculty(admin, r.data));
       }
     } catch (e) {
       errors.push({ row: rowNo, message: e instanceof Error ? e.message : "Unknown error" });
@@ -74,5 +63,5 @@ export async function POST(request: Request) {
   );
 
   errors.sort((a, b) => a.row - b.row);
-  return NextResponse.json({ created, updated, errors, credentials });
+  return NextResponse.json({ created, updated, errors });
 }

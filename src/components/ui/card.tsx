@@ -32,7 +32,7 @@ export function Badge({ tone = "neutral", className, ...props }: React.HTMLAttri
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === "accepted" ? "success" : status === "declined" ? "danger" : "warning";
+  const tone = status === "accepted" ? "success" : status === "declined" ? "danger" : status === "grouped" ? "info" : "warning";
   return <Badge tone={tone} className="capitalize">{status}</Badge>;
 }
 

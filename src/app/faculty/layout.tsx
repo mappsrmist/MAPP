@@ -2,7 +2,7 @@ import { Layers, UsersRound } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/portal-shell";
 import { redirect } from "next/navigation";
 import { FACULTY_COLS } from "@/lib/config";
-import { requireRole } from "@/lib/server/session";
+import { getGlobalFrozen, requireRole } from "@/lib/server/session";
 import type { FacultyRow } from "@/lib/types";
 import { FacultyProvider } from "./faculty-context";
 
@@ -15,9 +15,10 @@ export default async function FacultyLayout({ children }: { children: React.Reac
   const { supabase, user } = await requireRole("faculty");
   const { data: faculty } = await supabase.from("faculty").select(FACULTY_COLS).eq("id", user.id).single();
   if (!faculty) redirect("/login"); // signed in but no faculty record
+  const frozen = await getGlobalFrozen("faculty");
 
   return (
-    <PortalShell title="Faculty Portal" userName={faculty?.name ?? "Faculty"} userSub={faculty?.emp_id} nav={NAV}>
+    <PortalShell title="Faculty Portal" userName={faculty?.name ?? "Faculty"} userSub={faculty?.emp_id} nav={NAV} frozen={frozen}>
       <FacultyProvider initial={faculty as unknown as FacultyRow}>{children}</FacultyProvider>
     </PortalShell>
   );

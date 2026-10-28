@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, MapPin, Phone, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Card, CardContent, CardHeader, CardTitle, PageHeader, Skeleton, StatusBadge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useGlobalFreeze } from "@/components/freeze";
 import { ConfirmDialog, Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/form";
 import { PagedTable } from "@/components/paged-table";
@@ -44,6 +45,13 @@ export function MinorClient({ userId }: { userId: string }) {
 
   const active = status && (status.status === "pending" || status.status === "accepted");
   const declined = status?.status === "declined" ? status : null;
+
+  // the faculty's seat count on the status card is not a Realtime source for students: poll while visible
+  React.useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => document.visibilityState === "visible" && void loadStatus(), 20000);
+    return () => clearInterval(t);
+  }, [active, loadStatus]);
 
   React.useEffect(() => {
     if (status === undefined || active) return;
@@ -114,14 +122,14 @@ function FacultyList({
             ))}
           </Select>
         }
-        fetchPage={async (page, search) => {
-          const { data, error } = await supabase.rpc("list_faculty", { p_search: search || null, p_domain: domain || null, p_page: page });
+        fetchPage={async (page, search, signal) => {
+          const { data, error } = await supabase.rpc("list_faculty", { p_search: search || null, p_domain: domain || null, p_page: page }).abortSignal(signal);
           if (error) throw new Error(error.message);
           const rows = (data ?? []) as FacultyListRow[];
           return { rows, total: Number(rows[0]?.total_count ?? 0) };
         }}
         columns={[
-          { header: "Employee ID", cell: (r) => <span className="font-mono text-xs">{r.emp_id}</span> },
+          { header: "Emp ID", cell: (r) => <span className="font-mono text-xs">{r.emp_id}</span> },
           {
             header: "Name",
             cell: (r) => (
@@ -130,7 +138,16 @@ function FacultyList({
               </button>
             ),
           },
+          { header: "Domain", cell: (r) => (r.domains.length ? r.domains.join(", ") : "—") },
           { header: "Designation", cell: (r) => r.designation },
+          {
+            header: "Available Seats",
+            cell: (r) => (
+              <Badge tone="success" className="tabular-nums">
+                {r.available_seats}/{r.total_seats}
+              </Badge>
+            ),
+          },
         ]}
       />
       <FacultyDialog facultyId={selected} onClose={() => setSelected(null)} onRequested={onRequested} />
@@ -140,6 +157,7 @@ function FacultyList({
 
 function FacultyDialog({ facultyId, onClose, onRequested }: { facultyId: string | null; onClose: () => void; onRequested: () => void }) {
   const supabase = React.useMemo(() => createClient(), []);
+  const frozen = useGlobalFreeze();
   const [detail, setDetail] = React.useState<FacultyDetail | null>(null);
   const [confirm, setConfirm] = React.useState(false);
   const closeRef = React.useRef(onClose);
@@ -215,7 +233,9 @@ function FacultyDialog({ facultyId, onClose, onRequested }: { facultyId: string 
                 <Button variant="outline" onClick={onClose}>
                   Close
                 </Button>
-                <Button onClick={() => setConfirm(true)}>Request</Button>
+                <Button disabled={frozen} title={frozen ? MSG.FROZEN_TIP : undefined} onClick={() => setConfirm(true)}>
+                  Request
+                </Button>
               </DialogFooter>
             </>
           )}
@@ -235,9 +255,17 @@ function FacultyDialog({ facultyId, onClose, onRequested }: { facultyId: string 
 
 function StatusCard({ status }: { status: MinorStatus }) {
   const accepted = status.status === "accepted";
+  const rows: [string, React.ReactNode][] = [
+    ["Emp ID", <span key="e" className="font-mono">{status.faculty_emp_id}</span>],
+    ["Name", status.faculty_name],
+    ["Designation", status.designation],
+    ["Domain", status.domains.length ? status.domains.join(", ") : "—"],
+    ["Available Seats", <span key="s" className="tabular-nums">{status.available_seats}/{status.total_seats}</span>],
+    ["Status", <StatusBadge key="st" status={status.status} />],
+  ];
   return (
     <>
-      <PageHeader title="Minor Project" description="Your request status" />
+      <PageHeader title="Minor Project" description="Your request status. This updates live." />
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -247,24 +275,34 @@ function StatusCard({ status }: { status: MinorStatus }) {
           <StatusBadge status={status.status} />
         </CardHeader>
         <CardContent className="space-y-4">
-          <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">Employee ID</dt>
-            <dd className="font-mono">{status.faculty_emp_id}</dd>
-            <dt className="text-muted-foreground">Designation</dt>
-            <dd>{status.designation}</dd>
-            <dt className="text-muted-foreground">Status</dt>
-            <dd className="capitalize">{status.status}</dd>
+          <dl className="grid grid-cols-[9rem_1fr] items-center gap-x-3 gap-y-2 text-sm">
+            {rows.map(([k, v]) => (
+              <React.Fragment key={k}>
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd>{v}</dd>
+              </React.Fragment>
+            ))}
           </dl>
           <div className="rounded-lg border bg-accent/50 p-4 text-sm">
-            <p className="font-medium">{accepted ? "Your request has been accepted. Contact your faculty for the next steps." : MSG.MEET_FACULTY}</p>
-            <p className="mt-3 flex items-center gap-2">
-              <Phone className="h-4 w-4 text-muted-foreground" aria-hidden />
-              <span>{status.phone ?? "—"}</span>
-            </p>
-            <p className="mt-1 flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" aria-hidden />
-              <span>{status.venue ?? "—"}</span>
-            </p>
+            <p className="font-medium">{accepted ? "Your request has been accepted. Contact your guide for the next steps, then fill in the Application Form." : MSG.MEET_FACULTY}</p>
+            <dl className="mt-3 space-y-1">
+              <div className="flex items-center gap-2">
+                <dt className="sr-only">Phone</dt>
+                <Phone className="h-4 w-4 text-muted-foreground" aria-hidden />
+                <dd>
+                  <span className="text-muted-foreground">Phone: </span>
+                  {status.phone ?? "—"}
+                </dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <dt className="sr-only">Venue</dt>
+                <MapPin className="h-4 w-4 text-muted-foreground" aria-hidden />
+                <dd>
+                  <span className="text-muted-foreground">Venue: </span>
+                  {status.venue ?? "—"}
+                </dd>
+              </div>
+            </dl>
           </div>
         </CardContent>
       </Card>

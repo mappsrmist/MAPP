@@ -11,7 +11,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const PORT = 54329;
+const PORT = Number(process.env.MAPP_TEST_PG_PORT ?? 54329);
 let server: EmbeddedPostgres;
 let admin: Client; // superuser connection (setup + assertions)
 const dataDir = mkdtempSync(join(tmpdir(), "mapp-pg-"));
@@ -90,6 +90,11 @@ async function mkFaculty(cadre: "HOD" | "ASSOC_CHAIR" | "OTHER" = "OTHER", domai
 }
 const request = (s: string, f: string) =>
   as(s, async (q) => (await q("select public.submit_request($1) as id", [f])).rows[0].id as string);
+/** The jsonb argument of save_batch: one entry per student (section/advisor/contact/mail are per student). */
+const members = (s1: string, s2: string, section = "A") =>
+  JSON.stringify(
+    [s1, s2].map((student_id) => ({ student_id, section, advisor_name: "Dr X", contact_number: "9876543210", srm_mail: "x@srmist.edu.in" })),
+  );
 const respond = (f: string, rid: string, status: string, c = admin) =>
   as(f, (q) => q("select public.respond_request($1,$2)", [rid, status]), c);
 const choiceOf = async (s: string) =>
@@ -110,8 +115,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await admin?.end();
-  await server?.stop();
-  rmSync(dataDir, { recursive: true, force: true });
+  try {
+    await server?.stop(); // also deletes the data dir, which Windows can briefly keep locked
+  } catch {
+    // best effort: the folder is in the OS temp dir
+  }
+  try {
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  } catch {
+    // Windows may still hold the folder briefly after Postgres stops; it lives in the OS temp dir
+  }
 }, 60_000);
 
 describe("cadre -> seats / batches (e)", () => {
@@ -238,7 +251,7 @@ describe("decline unlocks Minor (c)", () => {
     await respond(f, r1, "accepted");
     await respond(f, r2, "accepted");
     await as(f, (q) =>
-      q("select public.save_batch($1, $2, $3, 'A', 'Dr X', '9876543210', 'x@srmist.edu.in')", [1, s1, s2]),
+      q("select public.save_batch($1, $2::jsonb)", [1, members(s1, s2)]),
     );
     expect((await admin.query("select count(*) from public.batches where faculty_id=$1", [f])).rows[0].count).toBe("1");
 
@@ -284,7 +297,7 @@ describe("batches", () => {
     for (const s of [a, b, c]) await respond(f, await request(s, f), "accepted");
     const outsider = d;
     const save = (no: number, s1: string, s2: string) =>
-      as(f, (q) => q("select public.save_batch($1,$2,$3,'A','Dr X','9876543210','x@srmist.edu.in')", [no, s1, s2]));
+      as(f, (q) => q("select public.save_batch($1, $2::jsonb)", [no, members(s1, s2)]));
     await expect(save(1, a, outsider)).rejects.toThrow(/accepted by you/i);
     await save(1, a, b);
     await expect(save(2, b, c)).rejects.toThrow(/another batch/i);
@@ -299,7 +312,7 @@ describe("batches", () => {
     const [a, b] = await Promise.all([mkStudent(), mkStudent()]);
     for (const s of [a, b]) await respond(f, await request(s, f), "accepted");
     await expect(
-      as(f, (q) => q("select public.save_batch(3,$1,$2,'A','Dr X','9876543210','x@srmist.edu.in')", [a, b])),
+      as(f, (q) => q("select public.save_batch(3, $1::jsonb)", [members(a, b)])),
     ).rejects.toThrow(/Invalid batch/i);
   });
 });
@@ -373,7 +386,7 @@ describe("privileges (hardening)", () => {
     const f2 = await mkFaculty();
     const [a, b] = await Promise.all([mkStudent(), mkStudent()]);
     for (const s of [a, b]) await respond(f1, await request(s, f1), "accepted");
-    await as(f1, (q) => q("select public.save_batch(1,$1,$2,'A','Dr X','9876543210','x@srmist.edu.in')", [a, b]));
+    await as(f1, (q) => q("select public.save_batch(1, $1::jsonb)", [members(a, b)]));
     const own = await as(f1, async (q) => (await q("select count(*)::int n from public.batch_members")).rows[0].n);
     const other = await as(f2, async (q) => (await q("select count(*)::int n from public.batch_members")).rows[0].n);
     expect(own).toBe(2);
@@ -424,7 +437,7 @@ describe("login throttle + hardening (0004)", () => {
       await respond(f, rid, "accepted");
     }
     await expect(
-      as(f, (q) => q("select public.save_batch(1,$1,$2,$3,'Dr X','9876543210','x@srmist.edu.in')", [a, b, "S".repeat(21)])),
+      as(f, (q) => q("select public.save_batch(1, $1::jsonb)", [members(a, b, "S".repeat(21))])),
     ).rejects.toThrow(/too long/);
   });
 });

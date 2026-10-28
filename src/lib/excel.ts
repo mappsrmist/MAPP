@@ -1,5 +1,5 @@
 /** Browser-side Excel export helpers (exceljs is loaded on demand). */
-import { BATCH_COLUMNS, HEADER_FILL, fillForBatch, type SheetRow } from "./batch-sheet";
+import { BATCH_COLUMNS, HEADER_FILL, fillForBatch, guideTitle, type GuideInfo, type SheetRow } from "./batch-sheet";
 
 /** Neutralise spreadsheet formula injection: cells starting with = + - @ (or tab/CR) are prefixed with '. */
 export function safeCell<T>(v: T): T | string {
@@ -49,43 +49,81 @@ export async function exportTable(filename: string, sheetName: string, columns: 
   save(await wb.xlsx.writeBuffer(), filename);
 }
 
-/** The faculty's final batch sheet: 2 rows per batch, Batch No. merged, pastel fill per batch. */
-export async function exportBatchSheet(filename: string, rows: SheetRow[]) {
+const sheetName = (name: string, used: Set<string>) => {
+  const base = name.replace(/[[\]:*?/\\]/g, " ").trim().slice(0, 28) || "Sheet";
+  let out = base;
+  for (let n = 2; used.has(out.toLowerCase()); n++) out = `${base.slice(0, 28 - String(n).length - 1)} ${n}`;
+  used.add(out.toLowerCase());
+  return out;
+};
+
+export interface BatchWorkbookSheet {
+  name: string;
+  /** Text of the title row above the table (e.g. the guide line). */
+  title: string;
+  rows: SheetRow[];
+}
+
+/**
+ * Batch sheets: a title row, then 2 rows per batch with Batch No. merged and a pastel fill per
+ * batch. Every cell goes through safeCell (formula-injection guard).
+ */
+export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Batches");
-  const widths = [12, 28, 20, 12, 28, 16, 32];
-  ws.columns = BATCH_COLUMNS.map((h, i) => ({ header: h, width: widths[i] }));
+  const used = new Set<string>();
+  const widths = [12, 28, 20, 12, 28, 16, 32, 28];
 
-  const header = ws.getRow(1);
-  header.eachCell((cell) => {
-    cell.font = { bold: true };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${HEADER_FILL}` } };
-    cell.alignment = { vertical: "middle", horizontal: "center" };
-    cell.border = border;
-  });
+  sheets.forEach((sheet) => {
+    const ws = wb.addWorksheet(sheetName(sheet.name, used));
+    ws.columns = widths.map((width) => ({ width }));
 
-  rows.forEach((r) => {
-    const row = ws.addRow([
-      r.first ? r.batchLabel : "",
-      safeCell(r.name),
-      safeCell(r.regNo),
-      safeCell(r.section),
-      safeCell(r.advisor),
-      safeCell(r.phone),
-      safeCell(r.mail),
-    ]);
-    row.eachCell({ includeEmpty: true }, (cell, col) => {
+    ws.mergeCells(1, 1, 1, BATCH_COLUMNS.length);
+    const title = ws.getCell(1, 1);
+    title.value = safeCell(sheet.title);
+    title.font = { bold: true, size: 12 };
+    title.alignment = { vertical: "middle", horizontal: "left" };
+
+    const header = ws.addRow([...BATCH_COLUMNS]);
+    header.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${HEADER_FILL}` } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = border;
-      cell.alignment = { vertical: "middle", horizontal: col === 1 ? "center" : "left" };
-      if (col === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${fillForBatch(r.batchNo)}` } };
     });
-    if (r.first) {
-      row.getCell(1).font = { bold: true };
-    } else {
-      // merge the Batch No. cell over this batch's two rows
-      ws.mergeCells(row.number - 1, 1, row.number, 1);
-    }
+
+    sheet.rows.forEach((r) => {
+      const row = ws.addRow([
+        r.first ? r.batchLabel : "",
+        safeCell(r.name),
+        safeCell(r.regNo),
+        safeCell(r.section),
+        safeCell(r.advisor),
+        safeCell(r.phone),
+        safeCell(r.mail),
+        safeCell(r.guideName),
+      ]);
+      row.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.border = border;
+        cell.alignment = { vertical: "middle", horizontal: col === 1 ? "center" : "left" };
+        if (col === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${fillForBatch(r.batchNo)}` } };
+      });
+      if (r.first) {
+        row.getCell(1).font = { bold: true };
+      } else {
+        // merge the Batch No. cell over this batch's two rows
+        ws.mergeCells(row.number - 1, 1, row.number, 1);
+      }
+    });
+    ws.views = [{ state: "frozen", ySplit: 2 }];
   });
-  save(await wb.xlsx.writeBuffer(), filename);
+  return wb;
 }
+
+export async function exportBatchWorkbook(filename: string, sheets: BatchWorkbookSheet[]) {
+  save(await (await buildBatchWorkbook(sheets)).xlsx.writeBuffer(), filename);
+}
+
+/** The faculty's own batch sheet. */
+export const exportBatchSheet = (filename: string, rows: SheetRow[], guide: GuideInfo) =>
+  exportBatchWorkbook(filename, [{ name: "Batches", title: guideTitle(guide), rows }]);
