@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { CADRES, type Cadre } from "./config";
-import { parseDob } from "./auth-utils";
 
 const trimmed = (label: string, max = 200) =>
   z.string({ error: `${label} is required` }).trim().min(1, `${label} is required`).max(max);
@@ -14,7 +13,12 @@ export const loginSchema = z.object({
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Enter your current password"),
-    newPassword: z.string().min(8, "Use at least 8 characters").max(72, "Use at most 72 characters"),
+    newPassword: z
+      .string()
+      .min(10, "Use at least 10 characters")
+      .max(72, "Use at most 72 characters")
+      .regex(/[A-Za-z]/, "Include at least one letter")
+      .regex(/[0-9]/, "Include at least one number"),
   })
   .refine((v) => v.currentPassword !== v.newPassword, {
     path: ["newPassword"],
@@ -30,7 +34,9 @@ const optional = z
   .transform((v) => (v ? v : null));
 
 export const studentRowSchema = z.object({
-  reg_no: trimmed("reg_no", 40).transform((v) => v.toUpperCase()),
+  reg_no: trimmed("reg_no", 30)
+    .transform((v) => v.toUpperCase())
+    .refine((v) => /^[A-Z0-9]{6,30}$/.test(v), "reg_no must be 6-30 letters/digits with no spaces"),
   name: trimmed("name"),
   dept: trimmed("dept", 100),
   section: optional,
@@ -48,12 +54,10 @@ const cadreSchema = z
 export const facultyRowSchema = z.object({
   emp_id: trimmed("emp_id", 40),
   name: trimmed("name"),
-  srm_email: trimmed("srm_email").pipe(z.email("srm_email is not valid")).transform((v) => v.toLowerCase()),
-  dob: trimmed("dob", 20).transform((v, ctx) => {
-    const iso = parseDob(v);
-    if (!iso) ctx.addIssue({ code: "custom", message: "dob must be DDMMYYYY or YYYY-MM-DD" });
-    return iso ?? "";
-  }),
+  srm_email: trimmed("srm_email")
+    .pipe(z.email("srm_email is not valid"))
+    .transform((v) => v.toLowerCase())
+    .refine((v) => !v.endsWith("mapp.local"), "srm_email uses a reserved domain"),
   designation: trimmed("designation", 100),
   cadre: cadreSchema,
   phone: optional,

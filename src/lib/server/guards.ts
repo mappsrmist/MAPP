@@ -16,10 +16,3 @@ export async function requireAdmin() {
   if (!profile || profile.role !== "admin" || profile.must_change_password) return null;
   return user;
 }
-
-/** Initial password for admin comes from the environment, never from the repo. */
-export function adminInitialPassword(): string {
-  const pw = process.env.ADMIN_INITIAL_PASSWORD;
-  if (!pw || pw.length < 8) throw new Error("ADMIN_INITIAL_PASSWORD must be set (min 8 chars)");
-  return pw;
-}

@@ -63,7 +63,7 @@ export function ChangePasswordForm({ onDone, submitLabel = "Change password" }: 
           </button>
         </div>
       </Field>
-      <Field label="New password (min 8 characters)" htmlFor="newPassword" error={errors.newPassword?.message}>
+      <Field label="New password (10+ characters, letters and numbers)" htmlFor="newPassword" error={errors.newPassword?.message}>
         <div className="relative">
           <Input
             id="newPassword"

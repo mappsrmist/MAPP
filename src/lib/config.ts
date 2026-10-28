@@ -1,13 +1,10 @@
-/** App-wide constants. Rules text and password formats are meant to be edited here. */
+/** App-wide constants. Rules text and popup messages are meant to be edited here. */
 
 export const PAGE_SIZE = 10;
 
 export const ADMIN_USERNAME = "mappCtech";
 export const ADMIN_EMAIL = "admin@mapp.local";
 export const STUDENT_EMAIL_DOMAIN = "students.mapp.local";
-
-/** Faculty initial password format (single place to change). Tokens: DD, MM, YYYY. */
-export const DOB_PASSWORD_FORMAT = "DDMMYYYY";
 
 export const CADRES = ["HOD", "ASSOC_CHAIR", "OTHER"] as const;
 export type Cadre = (typeof CADRES)[number];
@@ -23,7 +20,7 @@ export const CADRE_SEATS: Record<Cadre, number> = { HOD: 6, ASSOC_CHAIR: 4, OTHE
 export const seatsForCadre = (c: Cadre) => CADRE_SEATS[c];
 export const batchesForCadre = (c: Cadre) => CADRE_SEATS[c] / 2;
 
-/** Explicit faculty columns for client queries: never select `dob` (it is the initial password). */
+/** Explicit faculty columns for client queries. */
 export const FACULTY_COLS =
   "id, emp_id, name, srm_email, designation, cadre, phone, venue, domains, total_seats, accepted_count, available_seats";
 

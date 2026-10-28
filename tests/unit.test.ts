@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dobToPassword, normalizeRegNo, parseDob, usernameToEmail } from "@/lib/auth-utils";
+import { normalizeRegNo, usernameToEmail } from "@/lib/auth-utils";
 import { batchesForCadre, seatsForCadre } from "@/lib/config";
 import { buildSheetRows, fillForBatch } from "@/lib/batch-sheet";
 import { safeCell } from "@/lib/excel";
@@ -20,38 +20,40 @@ describe("login mapping", () => {
     expect(usernameToEmail("admin", "mappCtech")).toBe("admin@mapp.local");
     expect(usernameToEmail("admin", "someone")).toBeNull();
   });
-  it("parses DOBs in both formats and derives the DDMMYYYY password", () => {
-    expect(parseDob("15031980")).toBe("1980-03-15");
-    expect(parseDob("1980-03-15")).toBe("1980-03-15");
-    expect(parseDob("31022000")).toBeNull();
-    expect(parseDob("hello")).toBeNull();
-    expect(dobToPassword("1980-03-15")).toBe("15031980");
-  });
 });
 
 describe("validation", () => {
   it("accepts a student row and uppercases the reg no", () => {
-    const r = studentRowSchema.parse({ reg_no: " ra24110030100 58", name: "A", dept: "CSE" });
-    expect(r.reg_no).toBe("RA24110030100 58".toUpperCase());
+    const r = studentRowSchema.parse({ reg_no: " ra2411003010058", name: "A", dept: "CSE" });
+    expect(r.reg_no).toBe("RA2411003010058");
     expect(r.section).toBeNull();
+  });
+  it("rejects reg numbers that could not be a safe login name", () => {
+    expect(studentRowSchema.safeParse({ reg_no: "RA24 110030", name: "A", dept: "CSE" }).success).toBe(false);
+    expect(studentRowSchema.safeParse({ reg_no: "a@b.c", name: "A", dept: "CSE" }).success).toBe(false);
   });
   it("accepts a faculty row and normalises cadre/domains", () => {
     const r = facultyRowSchema.parse({
-      emp_id: "E1", name: "X", srm_email: "X@SRMIST.EDU.IN", dob: "15031980", designation: "Prof",
+      emp_id: "E1", name: "X", srm_email: "X@SRMIST.EDU.IN", designation: "Prof",
       cadre: "associate chair", domains: "AI; ML ;",
     });
     expect(r.cadre).toBe("ASSOC_CHAIR");
     expect(r.domains).toEqual(["AI", "ML"]);
     expect(r.srm_email).toBe("x@srmist.edu.in");
-    expect(r.dob).toBe("1980-03-15");
   });
   it("rejects bad rows", () => {
-    expect(facultyRowSchema.safeParse({ emp_id: "E1", name: "X", srm_email: "nope", dob: "x", designation: "P", cadre: "BOSS" }).success).toBe(false);
+    expect(facultyRowSchema.safeParse({ emp_id: "E1", name: "X", srm_email: "nope", designation: "P", cadre: "BOSS" }).success).toBe(false);
+    const base = { emp_id: "E1", name: "X", designation: "P", cadre: "OTHER" };
+    expect(facultyRowSchema.safeParse({ ...base, srm_email: "ra1@students.mapp.local" }).success).toBe(false);
+    expect(facultyRowSchema.safeParse({ ...base, srm_email: "admin@mapp.local" }).success).toBe(false);
   });
-  it("password change must differ from the old one and be 8+ chars", () => {
-    expect(changePasswordSchema.safeParse({ currentPassword: "abcdefgh", newPassword: "abcdefgh" }).success).toBe(false);
-    expect(changePasswordSchema.safeParse({ currentPassword: "abcdefgh", newPassword: "short" }).success).toBe(false);
-    expect(changePasswordSchema.safeParse({ currentPassword: "abcdefgh", newPassword: "abcdefgh1" }).success).toBe(true);
+  it("password change must differ from the old one and meet the strength policy", () => {
+    const cur = "Abcdefgh12";
+    expect(changePasswordSchema.safeParse({ currentPassword: cur, newPassword: cur }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ currentPassword: cur, newPassword: "short1" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ currentPassword: cur, newPassword: "onlyletterslong" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ currentPassword: cur, newPassword: "1234567890123" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ currentPassword: cur, newPassword: "BlueTiger2026x" }).success).toBe(true);
   });
   it("validates the batch form", () => {
     const ok = { student1: "a", student2: "b", section: "A", advisor: "Dr X", contact: "98765 43210", mail: "x@srmist.edu.in" };

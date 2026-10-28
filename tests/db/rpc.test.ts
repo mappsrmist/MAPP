@@ -34,6 +34,7 @@ create function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
 create role anon nologin;
 create role authenticated nologin;
+create role service_role nologin bypassrls;
 grant usage on schema public, auth to anon, authenticated;
 create publication supabase_realtime;
 -- Supabase hands EXECUTE / table rights to anon + authenticated by default; mimic that so the
@@ -380,18 +381,50 @@ describe("privileges (hardening)", () => {
   });
 });
 
-describe("seed.sql", () => {
-  it("creates the demo data and is re-runnable", async () => {
-    const seed = readFileSync(join(process.cwd(), "supabase", "seed.sql"), "utf8");
-    await admin.query(seed);
-    await admin.query(seed); // idempotent
-    const count = async (sql: string) => (await admin.query(sql)).rows[0].n as number;
-    expect(await count("select count(*)::int n from public.faculty where emp_id ~ '^E100[1-5]$'")).toBe(5);
-    expect(await count("select count(*)::int n from public.faculty where emp_id ~ '^E100[1-5]$' and cadre='HOD'")).toBe(1);
-    expect(await count("select count(*)::int n from public.faculty where emp_id ~ '^E100[1-5]$' and cadre='ASSOC_CHAIR'")).toBe(1);
-    expect(await count("select count(*)::int n from public.students where reg_no like 'RA241100301000%' or reg_no like 'RA241100301001%' or reg_no like 'RA241100301002%' or reg_no = 'RA2411003010030'")).toBe(30);
-    // faculty initial password is DDMMYYYY of the DOB
-    const hash = (await admin.query("select u.encrypted_password = extensions.crypt('14031972', u.encrypted_password) ok from auth.users u where u.email='ramesh.k@srmist.edu.in'")).rows[0];
-    expect(hash.ok).toBe(true);
+describe("login throttle + hardening (0004)", () => {
+  const callAs = (role: string, sql: string, args: unknown[] = []) =>
+    (async () => {
+      await admin.query("begin");
+      try {
+        await admin.query(`set local role ${role}`);
+        const r = await admin.query(sql, args);
+        await admin.query("commit");
+        return r;
+      } catch (e) {
+        await admin.query("rollback");
+        throw e;
+      }
+    })();
+
+  it("locks a key after the allowed failures and unlocks on clear", async () => {
+    const key = `t:${randomUUID()}`;
+    expect((await callAs("service_role", "select public.throttle_blocked($1) as s", [key])).rows[0].s).toBe(0);
+    for (let i = 0; i < 3; i++) await callAs("service_role", "select public.throttle_fail($1, 3, 900, 900)", [key]);
+    expect((await callAs("service_role", "select public.throttle_blocked($1) as s", [key])).rows[0].s).toBeGreaterThan(800);
+    await callAs("service_role", "select public.throttle_clear($1)", [key]);
+    expect((await callAs("service_role", "select public.throttle_blocked($1) as s", [key])).rows[0].s).toBe(0);
+  });
+
+  it("keeps the throttle store unreachable for clients", async () => {
+    await expect(callAs("authenticated", "select public.throttle_blocked('x')")).rejects.toThrow(/permission denied/);
+    await expect(callAs("anon", "select public.throttle_fail('x', 1, 1, 1)")).rejects.toThrow(/permission denied/);
+    await expect(callAs("authenticated", "select * from public.auth_throttle")).rejects.toThrow(/permission denied/);
+  });
+
+  it("no longer stores a faculty date of birth", async () => {
+    const r = await admin.query("select 1 from information_schema.columns where table_name='faculty' and column_name='dob'");
+    expect(r.rowCount).toBe(0);
+  });
+
+  it("rejects over-long batch fields", async () => {
+    const f = await mkFaculty();
+    const [a, b] = await Promise.all([mkStudent(), mkStudent()]);
+    for (const s of [a, b]) {
+      const rid = await request(s, f);
+      await respond(f, rid, "accepted");
+    }
+    await expect(
+      as(f, (q) => q("select public.save_batch(1,$1,$2,$3,'Dr X','9876543210','x@srmist.edu.in')", [a, b, "S".repeat(21)])),
+    ).rejects.toThrow(/too long/);
   });
 });

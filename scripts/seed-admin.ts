@@ -2,23 +2,22 @@
  * Creates (or leaves untouched) the admin account.
  *   username: mappCtech   |   initial password: ADMIN_INITIAL_PASSWORD from the environment
  * Usage: npm run seed:admin
- * Idempotent. The admin must change this password on first login.
+ * Idempotent. The admin must change this password on first login; remove ADMIN_INITIAL_PASSWORD from the
+ * environment afterwards (nothing else reads it).
  */
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { ADMIN_EMAIL, ADMIN_USERNAME } from "../src/lib/config";
 
 config({ path: ".env.local" });
 config();
-
-const ADMIN_USERNAME = "mappCtech";
-const ADMIN_EMAIL = "admin@mapp.local";
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const password = process.env.ADMIN_INITIAL_PASSWORD;
   if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
-  if (!password || password.length < 8) throw new Error("ADMIN_INITIAL_PASSWORD is required (min 8 characters)");
+  if (!password || password.length < 12) throw new Error("ADMIN_INITIAL_PASSWORD is required (min 12 characters)");
 
   const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 

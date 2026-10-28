@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const dev = process.env.NODE_ENV !== "production";
 
+// Only our own Supabase project may be contacted from the browser (no wildcard).
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseOrigins = supabaseUrl ? `${new URL(supabaseUrl).origin} ${new URL(supabaseUrl).origin.replace(/^http/, "ws")}` : "";
+
 // Content-Security-Policy: Next.js needs inline bootstrap scripts, so 'unsafe-inline' is kept for
 // scripts; everything else is locked to our own origin + Supabase. 'unsafe-eval'/ws: only in dev (HMR).
 const csp = [
@@ -10,7 +14,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${dev ? " ws: http://localhost:* http://127.0.0.1:*" : ""}`,
+  `connect-src 'self' ${supabaseOrigins}${dev ? " ws: http://localhost:* http://127.0.0.1:*" : ""}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -25,6 +29,8 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
 const nextConfig: NextConfig = {

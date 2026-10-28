@@ -5,7 +5,7 @@ import { Download, KeyRound, RotateCcw, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, PageHeader, Skeleton, StatusBadge } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/dialog";
+import { ConfirmDialog, Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { PagedTable } from "@/components/paged-table";
 import { CADRE_LABEL, FACULTY_COLS, PAGE_SIZE } from "@/lib/config";
 import { exportTable } from "@/lib/excel";
@@ -49,6 +49,7 @@ export function OverviewClient() {
   const supabase = React.useMemo(() => createClient(), []);
   const [stats, setStats] = React.useState<Stats | null>(null);
   const [tab, setTab] = React.useState<TabKey>("alloc");
+  const [issued, setIssued] = React.useState<null | { username: string; password: string }>(null);
   const [refresh, setRefresh] = React.useState(0);
   const [confirm, setConfirm] = React.useState<null | { title: string; description: string; label: string; run: () => Promise<void> }>(null);
 
@@ -81,14 +82,14 @@ export function OverviewClient() {
       body: JSON.stringify({ profileId }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.ok) toast.success("Password reset to default. The user must change it on next login.");
+    if (res.ok) setIssued({ username: json.username, password: json.password });
     else toast.error(json.error ?? "Could not reset password");
   }
 
   const askReset = (id: string, who: string) =>
     setConfirm({
       title: `Reset password for ${who}?`,
-      description: "The password is set back to its default and the user must choose a new one at next login.",
+      description: "A new random one-time password is generated and shown to you once. The user must choose their own password at next login.",
       label: "Reset password",
       run: () => resetPassword(id),
     });
@@ -320,6 +321,30 @@ export function OverviewClient() {
           ]}
         />
       )}
+
+      <Dialog open={issued !== null} onOpenChange={(o) => !o && setIssued(null)}>
+        <DialogContent title="One-time password" description="Shown only once and not stored. Share it privately with the user." className="max-w-md">
+          <dl className="space-y-2 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Username</dt>
+              <dd className="break-all font-mono">{issued?.username}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Password</dt>
+              <dd className="select-all rounded-lg bg-muted px-3 py-2 font-mono text-base tracking-wide">{issued?.password}</dd>
+            </div>
+          </dl>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => issued && navigator.clipboard.writeText(issued.password).then(() => toast.success("Copied"), () => toast.error("Could not copy"))}
+            >
+              Copy password
+            </Button>
+            <Button onClick={() => setIssued(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!confirm}

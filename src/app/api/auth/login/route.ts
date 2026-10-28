@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { bodyTooLarge, isSameOrigin } from "@/lib/server/origin";
+import { clearFailures, clientIp, loginKeys, recordFailure, retryAfter } from "@/lib/server/throttle";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators";
 import { usernameToEmail } from "@/lib/auth-utils";
 import { PORTAL_HOME, type Role } from "@/lib/config";
-import { isMock, MOCK_COOKIE } from "@/lib/mock/client";
-import { db } from "@/lib/mock/store";
 
-// Brute-force protection: Supabase Auth rate-limits sign-ins per IP (Dashboard -> Auth -> Rate Limits).
-// We also return one generic error for every failure mode so usernames cannot be enumerated.
-const FAIL = NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
+// One generic error for every failure mode so usernames cannot be enumerated.
+const fail = () => NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
+
+const locked = (seconds: number) =>
+  NextResponse.json(
+    { error: `Too many failed attempts. Try again in ${Math.max(1, Math.ceil(seconds / 60))} minute(s).` },
+    { status: 429, headers: { "Retry-After": String(seconds) } },
+  );
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -17,17 +21,18 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   const { role, username, password } = parsed.data;
 
-  const email = usernameToEmail(role, username);
-  if (!email) return FAIL.clone();
+  const keys = loginKeys(role, username, clientIp(request));
+  try {
+    const wait = await retryAfter(keys);
+    if (wait > 0) return locked(wait);
+  } catch {
+    return NextResponse.json({ error: "Sign-in is temporarily unavailable. Please try again shortly." }, { status: 503 });
+  }
 
-  if (isMock()) {
-    // DEV-ONLY: check the in-memory test accounts instead of Supabase Auth
-    const cred = db().creds.get(email);
-    const profile = cred && db().profiles.find((x) => x.id === cred.id);
-    if (!cred || cred.password !== password || !profile || profile.role !== role) return FAIL.clone();
-    const res = NextResponse.json({ role, mustChangePassword: false, redirect: PORTAL_HOME[role as Role] });
-    res.cookies.set(MOCK_COOKIE, `${role}.${cred.id}`, { httpOnly: true, sameSite: "lax", path: "/" });
-    return res;
+  const email = usernameToEmail(role, username);
+  if (!email) {
+    await recordFailure(keys);
+    return fail();
   }
 
   const supabase = await createClient();
@@ -36,7 +41,8 @@ export async function POST(request: Request) {
     if (error?.status === 429) {
       return NextResponse.json({ error: "Too many attempts. Please wait a few minutes and try again." }, { status: 429 });
     }
-    return FAIL.clone();
+    await recordFailure(keys);
+    return fail();
   }
 
   const { data: profile } = await supabase
@@ -48,9 +54,11 @@ export async function POST(request: Request) {
   // The credentials may be valid but belong to a different role than the tab used.
   if (!profile || profile.role !== role) {
     await supabase.auth.signOut();
-    return FAIL.clone();
+    await recordFailure(keys);
+    return fail();
   }
 
+  await clearFailures(keys);
   return NextResponse.json({
     role,
     mustChangePassword: profile.must_change_password,
