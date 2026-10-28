@@ -16,52 +16,66 @@ const locked = (seconds: number) =>
   );
 
 export async function POST(request: Request) {
-  if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const parsed = loginSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
-  const { role, username, password } = parsed.data;
-
-  const keys = loginKeys(role, username, clientIp(request));
   try {
-    const wait = await retryAfter(keys);
-    if (wait > 0) return locked(wait);
-  } catch {
-    return NextResponse.json({ error: "Sign-in is temporarily unavailable. Please try again shortly." }, { status: 503 });
-  }
-
-  const email = usernameToEmail(role, username);
-  if (!email) {
-    await recordFailure(keys);
-    return fail();
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.user) {
-    if (error?.status === 429) {
-      return NextResponse.json({ error: "Too many attempts. Please wait a few minutes and try again." }, { status: 429 });
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment variables.");
+      return NextResponse.json(
+        { error: "Configuration error: Supabase environment variables are missing. Please configure them in Vercel." },
+        { status: 500 },
+      );
     }
-    await recordFailure(keys);
-    return fail();
+
+    if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const parsed = loginSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    const { role, username, password } = parsed.data;
+
+    const keys = loginKeys(role, username, clientIp(request));
+    try {
+      const wait = await retryAfter(keys);
+      if (wait > 0) return locked(wait);
+    } catch {
+      return NextResponse.json({ error: "Sign-in is temporarily unavailable. Please try again shortly." }, { status: 503 });
+    }
+
+    const email = usernameToEmail(role, username);
+    if (!email) {
+      await recordFailure(keys);
+      return fail();
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      if (error?.status === 429) {
+        return NextResponse.json({ error: "Too many attempts. Please wait a few minutes and try again." }, { status: 429 });
+      }
+      await recordFailure(keys);
+      return fail();
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, must_change_password")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    // The credentials may be valid but belong to a different role than the tab used.
+    if (!profile || profile.role !== role) {
+      await supabase.auth.signOut();
+      await recordFailure(keys);
+      return fail();
+    }
+
+    await clearFailures(keys);
+    return NextResponse.json({
+      role,
+      mustChangePassword: profile.must_change_password,
+      redirect: profile.must_change_password ? "/force-password" : PORTAL_HOME[role as Role],
+    });
+  } catch (error) {
+    console.error("Unexpected error in /api/auth/login:", error);
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, must_change_password")
-    .eq("id", data.user.id)
-    .maybeSingle();
-
-  // The credentials may be valid but belong to a different role than the tab used.
-  if (!profile || profile.role !== role) {
-    await supabase.auth.signOut();
-    await recordFailure(keys);
-    return fail();
-  }
-
-  await clearFailures(keys);
-  return NextResponse.json({
-    role,
-    mustChangePassword: profile.must_change_password,
-    redirect: profile.must_change_password ? "/force-password" : PORTAL_HOME[role as Role],
-  });
 }

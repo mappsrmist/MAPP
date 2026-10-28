@@ -85,7 +85,8 @@ export function PagedTable<T>({
 
   React.useEffect(() => {
     if (!pollMs) return;
-    const t = setInterval(() => void load(), pollMs);
+    // background tabs do not poll: keeps database load proportional to people actually looking
+    const t = setInterval(() => document.visibilityState === "visible" && void load(), pollMs);
     return () => clearInterval(t);
   }, [pollMs, load]);
 

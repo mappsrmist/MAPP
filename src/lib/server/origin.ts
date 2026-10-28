@@ -12,8 +12,12 @@ export function isSameOrigin(request: Request): boolean {
     return site === null || site === "same-origin" || site === "none"; // non-browser clients send neither
   }
   try {
-    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-    return new URL(origin).host === host;
+    const rawHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    if (!rawHost) return false;
+    // Proxies like Vercel or Cloudflare may send comma-separated hosts or include standard ports
+    const host = rawHost.split(",")[0].trim().toLowerCase().replace(/:(80|443)$/, "");
+    const originHost = new URL(origin).host.toLowerCase().replace(/:(80|443)$/, "");
+    return originHost === host;
   } catch {
     return false;
   }

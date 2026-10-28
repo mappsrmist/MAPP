@@ -13,7 +13,7 @@ import { useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
 import type { FacultyDetail, FacultyListRow, MinorStatus } from "@/lib/types";
 
-export function MinorClient() {
+export function MinorClient({ userId }: { userId: string }) {
   const supabase = React.useMemo(() => createClient(), []);
   const [status, setStatus] = React.useState<MinorStatus | null | undefined>(undefined); // undefined = loading
   const [domains, setDomains] = React.useState<string[]>([]);
@@ -37,7 +37,7 @@ export function MinorClient() {
 
   // The student's own request changes (accepted / declined) arrive live; faculty seat changes are
   // picked up by the list's polling + focus refetch because students cannot read `faculty` directly.
-  useRealtime([{ table: "requests" }], () => {
+  useRealtime([{ table: "requests", filter: `student_id=eq.${userId}` }], () => {
     void loadStatus();
     setRefresh((n) => n + 1);
   });
@@ -100,7 +100,7 @@ function FacultyList({
         searchPlaceholder="Search by name or employee ID"
         deps={[domain]}
         refreshKey={refreshKey}
-        pollMs={10000}
+        pollMs={20000}
         emptyTitle="No faculty available"
         emptyHint="Faculty with no remaining seats are hidden. Try changing the search or domain filter."
         onError={(m) => toast.error(m)}

@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const TABS: { role: Role; label: string; icon: React.ReactNode; userLabel: string; placeholder: string }[] = [
   { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration number", placeholder: "RA2411003010058" },
   { role: "faculty", label: "Faculty", icon: <Users className="h-4 w-4" />, userLabel: "SRM mail ID", placeholder: "name@srmist.edu.in" },
-  { role: "admin", label: "Admin", icon: <ShieldCheck className="h-4 w-4" />, userLabel: "Username", placeholder: "Admin username" },
+  { role: "admin", label: "Admin", icon: <ShieldCheck className="h-4 w-4" />, userLabel: "Username", placeholder: "mappCtech" },
 ];
 
 export default function LoginPage() {
@@ -39,7 +39,7 @@ export default function LoginPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(json.error ?? "Could not sign in");
+        setError(json.error ?? (res.status === 500 ? "Server configuration error. Please check server logs and environment variables." : "Could not sign in"));
         return;
       }
       toast.success("Signed in");

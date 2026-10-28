@@ -62,7 +62,7 @@ Import the repo, set the three Supabase env vars (service-role key as a server-o
 5. Domain filter matches any of a faculty's domains.
 6. `project_type` (`minor`|`major`) exists on `requests`, `batches`, `batch_members`; the one-active-request index is per project type.
 7. AI domain chatbot is out of scope.
-8. **Live updates**: a student's own request status updates via Realtime. Students can't read `faculty` (RLS), so the faculty list refreshes by 10 s polling and on window focus rather than Realtime. Faculty/admin get Realtime seat updates.
+8. **Live updates**: a student's own request status updates via Realtime. Students can't read `faculty` (RLS), so the faculty list refreshes by 20 s polling (visible tabs only) and on window focus rather than Realtime. Faculty/admin get Realtime seat updates.
 9. Admin "remove allocation" marks the request `declined` (freeing the seat and unlocking the student).
 10. Batch contact must be 10–13 digits; SRM mail must be a valid email (not restricted to one domain).
 11. Imports run in 50-row chunks from the browser so they fit serverless time limits.

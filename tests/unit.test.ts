@@ -18,6 +18,8 @@ describe("login mapping", () => {
     expect(usernameToEmail("student", " ra2411003010058")).toBe("ra2411003010058@students.mapp.local");
     expect(usernameToEmail("faculty", " Priya@SRMIST.edu.in ")).toBe("priya@srmist.edu.in");
     expect(usernameToEmail("admin", "mappCtech")).toBe("admin@mapp.local");
+    expect(usernameToEmail("admin", "admin")).toBe("admin@mapp.local");
+    expect(usernameToEmail("admin", "admin@mapp.local")).toBe("admin@mapp.local");
     expect(usernameToEmail("admin", "someone")).toBeNull();
   });
 });
