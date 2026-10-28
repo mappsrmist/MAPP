@@ -505,3 +505,30 @@ describe("C2: admin allocation actions", () => {
     expect(Object.fromEntries(rows.map((r) => [r.display_status, r.n]))).toEqual({ grouped: 2, pending: 1 });
   });
 });
+
+// Keep this last: it wipes the whole database.
+describe("supabase/reset_all_data.sql", () => {
+  it("returns a populated database to a clean state and keeps only the admin", async () => {
+    const f = await mkFaculty();
+    const [a, b] = [await accepted(f), await accepted(f)];
+    await group(f, 1, a, b);
+    await saveApp(a);
+    const adm = await mkAdmin();
+    await as(adm, (q) => q("select public.admin_set_faculty_freeze($1,true)", [f]));
+    await setGlobalFreeze(true);
+    await admin.query("select public.throttle_fail('acct:x', 5, 900, 900)");
+    expect((await admin.query("select count(*)::int n from public.auth_throttle")).rows[0].n).toBe(1);
+
+    await admin.query(readFileSync(join(process.cwd(), "supabase", "reset_all_data.sql"), "utf8"));
+
+    const count = async (t: string) => (await admin.query(`select count(*)::int n from ${t}`)).rows[0].n as number;
+    for (const t of ["public.students", "public.faculty", "public.requests", "public.batches", "public.batch_members", "public.applications", "public.audit_log", "public.auth_throttle"]) {
+      expect(await count(t), t).toBe(0);
+    }
+    const left = (await admin.query("select role from public.profiles")).rows.map((r) => r.role);
+    expect(left.length).toBeGreaterThan(0);
+    expect(new Set(left)).toEqual(new Set(["admin"]));
+    expect(await count("auth.users")).toBe(left.length);
+    expect((await admin.query("select global_frozen from public.system_settings")).rows[0].global_frozen).toBe(false);
+  });
+});
