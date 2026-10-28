@@ -1,24 +1,29 @@
+import { safeApi } from "@/lib/server/safe-api";
 import { NextResponse } from "next/server";
 import { bodyTooLarge, isSameOrigin, readJsonBody } from "@/lib/server/origin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/server/guards";
 import { upsertFaculty, upsertStudent, type Upserted } from "@/lib/server/importers";
 import { facultyRowSchema, importRequestSchema, studentRowSchema } from "@/lib/validators";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
 
 export const maxDuration = 60;
 
 interface RowError {
-  row: number; // 1-based data row number in the uploaded file
+  row: number; // Excel row number (row 1 contains headers)
   message: string;
 }
 
 /**
- * Imports one chunk (<=100 rows) of students or faculty. The client sends the CSV in chunks.
+ * Imports one chunk (<=100 rows) of students or faculty. The client parses an Excel workbook and sends validated-size chunks.
  * New accounts start with the registration number / employee ID as password and must change it at first login.
  */
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  if (!(await requireAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await requireAdmin();
+  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const limited = await enforceRateLimit([{ key: `import:${user.id}`, limit: 120, window: 60 }]);
+  if (limited) return limited;
 
   const body = importRequestSchema.safeParse(await readJsonBody(request));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0].message }, { status: 400 });
@@ -35,7 +40,7 @@ export async function POST(request: Request) {
   };
 
   const work = rows.map((raw, i) => async () => {
-    const rowNo = offset + i + 1;
+    const rowNo = offset + i + 2;
     try {
       if (type === "students") {
         const r = studentRowSchema.safeParse(raw);
@@ -65,3 +70,5 @@ export async function POST(request: Request) {
   errors.sort((a, b) => a.row - b.row);
   return NextResponse.json({ created, updated, errors });
 }
+
+export const POST = safeApi(handlePost);

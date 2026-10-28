@@ -14,6 +14,55 @@ import { join } from "node:path";
 const PORT = Number(process.env.MAPP_TEST_PG_PORT_V2 ?? 54330);
 let server: EmbeddedPostgres;
 let admin: Client;
+
+describe("atomic security budgets", () => {
+  it("marks budget-consuming RPCs volatile for PostgREST write transactions", async () => {
+    const { rows } = await admin.query("select proname, provolatile from pg_proc where pronamespace='public'::regnamespace and proname=any($1::text[])",
+      [["list_faculty", "list_domains", "get_faculty", "my_minor_status", "get_application", "admin_stats"]]);
+    expect(rows).toHaveLength(6);
+    expect(rows.every((r) => r.provolatile === "v")).toBe(true);
+  });
+  it("denies direct role escalation and cross-role admin calls", async () => {
+    const student = await mkStudent();
+    const faculty = await mkFaculty();
+    await expect(as(student, (q) => q("update public.profiles set role='admin' where id=auth.uid()"))).rejects.toThrow(/permission denied/i);
+    await expect(as(faculty, (q) => q("select public.admin_set_global_freeze(true)"))).rejects.toThrow(/not allowed/i);
+  });
+  it("treats SQL-shaped search values as data", async () => {
+    const student = await mkStudent();
+    const results = await as(student, (q) => q("select * from public.list_faculty($1,null,1)", ["'; drop table public.profiles; --"]));
+    expect(results.rows).toHaveLength(0);
+    expect((await admin.query("select count(*) from public.profiles")).rows).toHaveLength(1);
+  });
+  it("persists consumption across successful requests and cannot be cleared by users", async () => {
+    const key = `budget:${randomUUID()}`;
+    for (let i = 0; i < 3; i++) {
+      expect((await admin.query("select public.consume_request_budget($1,3,60) as wait", [key])).rows[0].wait).toBe(0);
+    }
+    expect((await admin.query("select public.consume_request_budget($1,3,60) as wait", [key])).rows[0].wait).toBeGreaterThan(0);
+    const student = await mkStudent();
+    await expect(as(student, (q) => q("select public.consume_request_budget('x',1000,60)"))).rejects.toThrow(/permission denied/i);
+    await expect(as(student, (q) => q("delete from public.request_budgets"))).rejects.toThrow(/permission denied/i);
+  });
+  it("limits direct RPC calls for each verified user independently", async () => {
+    const student = await mkStudent();
+    await admin.query("insert into public.request_budgets values ($1,120,clock_timestamp())", [`rpc:${student}`]);
+    await expect(as(student, (q) => q("select public.list_domains()"))).rejects.toThrow(/Too many requests/);
+    await expect(as(await mkStudent(), (q) => q("select public.list_domains()"))).resolves.toBeDefined();
+  });
+  it("serializes concurrent budget consumption", async () => {
+    const key = `parallel:${randomUUID()}`;
+    const peers = await Promise.all(Array.from({ length: 6 }, async () => {
+      const peer = new Client({ host: "localhost", port: PORT, user: "postgres", password: "pw", database: "mapp" });
+      await peer.connect();
+      return peer;
+    }));
+    try {
+      const results = await Promise.all(peers.map((peer) => peer.query("select public.consume_request_budget($1,3,60) as wait", [key])));
+      expect(results.filter((r) => r.rows[0].wait === 0)).toHaveLength(3);
+    } finally { await Promise.all(peers.map((peer) => peer.end())); }
+  });
+});
 const dataDir = mkdtempSync(join(tmpdir(), "mapp-pg2-"));
 
 const STUB = `

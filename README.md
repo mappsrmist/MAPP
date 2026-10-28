@@ -8,7 +8,7 @@ Next.js 16 (App Router, TypeScript, Tailwind) + Supabase (Postgres, Auth, RLS, R
 2. **Run migrations** in order, in the Supabase SQL editor (or `supabase db push` with the CLI):
    `0001_schema.sql`, `0002_rpc.sql`, `0003_rls_realtime.sql`, `0004_hardening.sql`, `0005_v2.sql`. **Login will not work until `0004` is applied** (it creates the brute-force throttle); the v2 portal needs `0005`. `0006_drop_legacy_batch_columns.sql` is a follow-up: apply it only after v2 is deployed and the batch sheets look right (see CHANGELOG.md).
 3. **Create the admin**: `npm install && npm run seed:admin` (username `mappCtech`). Sign in, set a new password, then delete `ADMIN_INITIAL_PASSWORD` from the environment.
-4. **Load data**: sign in as admin -> **Import data**, upload the student and faculty CSVs (templates are downloadable on that page), New accounts start with an initial password: students use their **registration number** (username and password), faculty use their **SRM email** as username and their **employee ID** as password. Everyone must choose a new password at first sign-in. Forgotten password? Use **Reset password** in the admin portal to put the initial password back.
+4. **Load data**: sign in as admin -> **Import data**, upload the student and faculty Excel workbooks (templates are downloadable on that page), New accounts start with an initial password: students use their **registration number** (username and password), faculty use their **SRM email** as username and their **employee ID** as password. Everyone must choose a new password at first sign-in. Forgotten password? Use **Reset password** in the admin portal to put the initial password back.
 5. `npm run dev` -> http://localhost:3000
 
 **Supabase dashboard settings (required before going live):**
@@ -25,6 +25,7 @@ Next.js 16 (App Router, TypeScript, Tailwind) + Supabase (Postgres, Auth, RLS, R
 | `npm run lint`, `npm run typecheck` | static checks |
 | `npm test` | Vitest: unit tests + DB tests |
 | `npm run seed:admin` | create the admin account (one-off) |
+| `npm run security:client-secrets` | scan `.next/static` for configured private credential values after a successful build |
 
 The DB tests boot a throw-away real Postgres (`embedded-postgres`, no Docker), stub the Supabase `auth` schema, apply every migration, and test: one student = one request, accepting beyond capacity fails (incl. a concurrent race), decline unlocks Minor, MOOC ⇄ Minor exclusivity, cadre → seats/batches, batch rules, login throttle, RLS/privilege checks, and the v2 features (multi-domain list, application-form gate, group/ungroup, freeze, audit log, admin allocation actions). If the default test ports are busy, set `MAPP_TEST_PG_PORT` / `MAPP_TEST_PG_PORT_V2`.
 
@@ -34,6 +35,18 @@ Import the repo, set the three Supabase env vars (service-role key as a server-o
 
 ## Security notes
 
+**Apply `0007_security_limits.sql` before deploying the hardened API routes.** Missing limiter functions intentionally make requests fail closed (503). Apply migrations in order through `0007` on a backup/staging database first. This source change does not apply any production migrations or provider settings.
+
+Admin data imports, templates and error reports now use **Excel `.xlsx` only**. Use one worksheet, headers on row 1, at most 5,000 data rows and a 2 MiB file limit. Text-formatted identifiers preserve leading zeros. Formulas, hyperlinks, merged cells, macros and embedded objects are rejected; ZIP expansion is capped at 20 MiB before workbook parsing. The server independently restricts requests to 512 KiB, 100 rows, known columns and bounded string cells. Error reports identify the Excel row number, including the header row.
+
+Shared request budgets count successful as well as unsuccessful application API calls: login 30/account and 5,000/IP per 15 minutes (to accommodate campus onboarding); password change 10/user/minute; admin import 120/admin/minute; reset 20/admin/minute. The existing failure-based login locks apply too. Business RPCs independently consume a combined 120/user/minute database budget, including direct Supabase calls. Exposed read RPCs use POST because consuming a budget writes to the database. Limiter/store failures return generic errors without database details.
+
+**Coverage limits:** failed RPC transactions roll back their counters; direct table reads, Supabase Auth and Realtime need provider/gateway abuse controls. The current code does not provide universal per-user throttling for those surfaces. Retaining identifier-based initial/reset passwords is the explicitly requested college policy and leaves accounts vulnerable to a correct first guess until the legitimate owner changes the password. Faculty employee IDs are normal displayed project data, so they must not be treated as secrets.
+
+There is no PDF upload, storage bucket or AI endpoint in this checkout. PDFs are generated for download. Consequently no PDF malware scanning or prompt-injection filter is claimed. A future upload feature requires server-side file verification, private storage, ownership policies and malware quarantine before downloads are permitted.
+
+Before release, verify the deployed Supabase configuration against the [production checklist](https://supabase.com/docs/guides/deployment/going-into-prod): disable public signup, configure Auth rate limits and password policy, protect dashboard/admin access with MFA, and verify session expiration. Restrict Vercel environment access and rotate any previously exposed secret. The Supabase anon/publishable key is intentionally public and must be protected by RLS; service-role and other private API keys must stay server-only. Vercel deployments use the [platform-forwarded IP header](https://vercel.com/docs/headers/request-headers); other reverse proxies must overwrite client-supplied forwarding headers.
+
 - **Authentication**: Supabase Auth (email + password; usernames are mapped to emails server-side in `/api/auth/login`). No sign-ups, no password reset by email, no social login: the admin resets passwords.
 - **Initial passwords**: registration number (students) / employee ID (faculty). These are guessable by anyone who knows them, so the account is locked to the change-password screen until the user sets a new one (10+ characters with a letter and a number, not containing the username), and the login throttle limits guessing. Accounts that have not yet signed in are the exposed ones: ask everyone to sign in and change it promptly, and keep the allocation window closed until then if possible.
 - **Brute-force protection** (`auth_throttle`, service-role only): 5 failures per account+IP, 30 per account across all IPs, 300 per IP, each per 15 minutes, then a 15-minute lock. Counters are scoped so one student cannot lock out another. If the throttle store is unreachable, sign-in fails closed (503). Supabase's own per-IP limits apply on top.
@@ -42,7 +55,7 @@ Import the repo, set the three Supabase env vars (service-role key as a server-o
 - **Route handlers** enforce same-origin (Origin / Sec-Fetch-Site) checks, body-size limits and zod validation; error responses never echo database or auth internals. Import rejects usernames that would take over an existing account of another role, and reserved email domains.
 - **Passwords**: changing a password verifies the current one (throttled), signs out all other sessions, and clears the first-login flag server-side. An admin reset flags the account first, then restores the initial password.
 - **Headers**: CSP (connections limited to this site and the project's own Supabase origin), HSTS, `X-Frame-Options: DENY`, `nosniff`, COOP/CORP, `noindex`. `script-src` keeps `'unsafe-inline'` because Next.js needs inline bootstrap scripts without per-request nonces; no user content is ever rendered as HTML.
-- Excel/CSV cells starting with `= + - @` are neutralised on export and in downloaded CSVs (formula-injection guard).
+- Excel cells starting with `= + - @` are neutralised on export and in downloaded workbooks (formula-injection guard).
 
 ### Security verification limits
 

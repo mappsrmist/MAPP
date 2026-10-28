@@ -4,6 +4,25 @@ const dev = process.env.NODE_ENV !== "production";
 
 // Only our own Supabase project may be contacted from the browser (no wildcard).
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+if (!dev && supabaseUrl && new URL(supabaseUrl).protocol !== "https:") {
+  throw new Error("Production Supabase connections must use HTTPS.");
+}
+for (const name of Object.keys(process.env)) {
+  if (/^NEXT_PUBLIC_.*(?:SERVICE_ROLE|SECRET|PRIVATE|PASSWORD|API_KEY|ACCESS_TOKEN|OPENAI|ANTHROPIC)/i.test(name)) {
+    throw new Error(`Private credentials must not use a public environment name: ${name}`);
+  }
+}
+const publicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+if (publicKey?.startsWith("sb_secret_")) throw new Error("The browser Supabase key must be publishable, never secret.");
+if (publicKey?.split(".").length === 3) {
+  try {
+    if (JSON.parse(Buffer.from(publicKey.split(".")[1], "base64url").toString()).role === "service_role") {
+      throw new Error("The browser Supabase key must not have the service_role role.");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("service_role")) throw error;
+  }
+}
 const supabaseOrigins = supabaseUrl ? `${new URL(supabaseUrl).origin} ${new URL(supabaseUrl).origin.replace(/^http/, "ws")}` : "";
 
 // Content-Security-Policy: Next.js needs inline bootstrap scripts, so 'unsafe-inline' is kept for
@@ -47,6 +66,7 @@ const nextConfig: NextConfig = {
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
       },
     },
   },

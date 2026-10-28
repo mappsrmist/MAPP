@@ -1,3 +1,4 @@
+import { safeApi } from "@/lib/server/safe-api";
 import { NextResponse } from "next/server";
 import { bodyTooLarge, isSameOrigin, readJsonBody } from "@/lib/server/origin";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
@@ -6,8 +7,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordFailure, retryAfter, type ThrottleKey } from "@/lib/server/throttle";
 import { changePasswordSchema } from "@/lib/validators";
 import { PORTAL_HOME, type Role } from "@/lib/config";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const parsed = changePasswordSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
@@ -18,6 +20,8 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  const limited = await enforceRateLimit([{ key: `password:${user.id}`, limit: 10, window: 60 }]);
+  if (limited) return limited;
 
   // Someone on a stolen session must not be able to brute-force the current password here.
   const keys: ThrottleKey[] = [{ key: `cp:${user.id}`, max: 5 }];
@@ -61,3 +65,5 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true, redirect: PORTAL_HOME[updated.role as Role] });
 }
+
+export const POST = safeApi(handlePost);

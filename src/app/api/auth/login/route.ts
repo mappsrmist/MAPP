@@ -1,3 +1,4 @@
+import { safeApi } from "@/lib/server/safe-api";
 import { NextResponse } from "next/server";
 import { bodyTooLarge, isSameOrigin, readJsonBody } from "@/lib/server/origin";
 import { clearFailures, clientIp, loginKeys, recordFailure, retryAfter } from "@/lib/server/throttle";
@@ -5,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators";
 import { usernameToEmail } from "@/lib/auth-utils";
 import { PORTAL_HOME, type Role } from "@/lib/config";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
 
 // One generic error for every failure mode so usernames cannot be enumerated.
 const fail = () => NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
@@ -15,13 +17,19 @@ const locked = (seconds: number) =>
     { status: 429, headers: { "Retry-After": String(seconds) } },
   );
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const parsed = loginSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   const { role, username, password } = parsed.data;
 
   const keys = loginKeys(role, username, clientIp(request));
+  const limited = await enforceRateLimit([
+    // Campus NAT may carry the entire 3,000-student onboarding session.
+    { key: `login:${keys[2].key}`, limit: 5000, window: 900 },
+    { key: `login:${keys[1].key}`, limit: 30, window: 900 },
+  ]);
+  if (limited) return limited;
   try {
     const wait = await retryAfter(keys);
     if (wait > 0) return locked(wait);
@@ -65,3 +73,5 @@ export async function POST(request: Request) {
     redirect: profile.must_change_password ? "/force-password" : PORTAL_HOME[role as Role],
   });
 }
+
+export const POST = safeApi(handlePost);

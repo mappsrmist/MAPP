@@ -28,7 +28,7 @@ export function bodyTooLarge(request: Request): boolean {
 export async function readJsonBody(request: Request): Promise<unknown> {
   if (bodyTooLarge(request) || !request.body) return null;
   const reader = request.body.getReader();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
   let bytes = 0;
   let text = "";
   try {

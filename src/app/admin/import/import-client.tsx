@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Papa from "papaparse";
+import { exportTable } from "@/lib/excel";
+import { IMPORT_HEADERS, parseImportWorkbook, validateImportFile } from "@/lib/import-excel";
 import { CheckCircle2, Download, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,13 +13,13 @@ type Kind = "students" | "faculty";
 
 const TEMPLATES: Record<Kind, { header: string[]; sample: string[]; note: string }> = {
   students: {
-    header: ["reg_no", "name", "dept", "section", "email"],
+    header: IMPORT_HEADERS.students,
     sample: ["RA2411003010058", "Aarav Kumar", "CSE", "A", ""],
     note: "section is required (it appears on the Approached list and the Excel sheets); email is optional. New students sign in with their registration number as the password and must change it at first login.",
   },
   faculty: {
-    header: ["emp_id", "name", "srm_email", "designation", "cadre", "phone", "venue", "domains"],
-    sample: ["E1001", "Dr. Priya S", "priya@srmist.edu.in", "Professor", "OTHER", "9876543210", "TP 801", "AI;Machine Learning"],
+    header: IMPORT_HEADERS.faculty,
+    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "Professor", "OTHER", "9876543210", "TP 801", "AI;Machine Learning"],
     note: "cadre: HOD, ASSOC_CHAIR or OTHER. domains: separate with semicolons. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
   },
 };
@@ -35,11 +36,15 @@ export function ImportClient() {
   const [rows, setRows] = React.useState<Record<string, string>[] | null>(null);
   const [fileName, setFileName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [reading, setReading] = React.useState(false);
+  const fileVersion = React.useRef(0);
   const [progress, setProgress] = React.useState(0);
   const [result, setResult] = React.useState<{ created: number; updated: number; errors: RowError[] } | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   function reset(next?: Kind) {
+    fileVersion.current++;
+    setReading(false);
     if (next) setKind(next);
     setRows(null);
     setFileName("");
@@ -48,34 +53,32 @@ export function ImportClient() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
     const t = TEMPLATES[kind];
-    const csv = Papa.unparse([t.header, t.sample]);
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: `mapp_${kind}_template.csv` });
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await exportTable(`mapp_${kind}_template.xlsx`, kind, t.header.map((h) => ({ header: h, key: h, width: 24 })),
+        [Object.fromEntries(t.header.map((h, i) => [h, t.sample[i]]))]);
+    } catch { toast.error("Could not create the Excel template. Please try again."); }
   }
 
-  function onFile(file: File | undefined) {
+  async function onFile(file: File | undefined) {
+    const version = ++fileVersion.current;
+    setRows(null);
+    setFileName("");
     setResult(null);
     if (!file) return;
-    setFileName(file.name);
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      transformHeader: (h) => h.trim().toLowerCase(),
-      transform: (v) => (typeof v === "string" ? v.trim() : v),
-      complete: (res) => {
-        const missing = TEMPLATES[kind].header.filter((h) => !(res.meta.fields ?? []).includes(h) && !["email", "phone", "venue", "domains"].includes(h));
-        if (missing.length) {
-          toast.error(`Missing column(s): ${missing.join(", ")}`);
-          return setRows(null);
-        }
-        setRows(res.data);
-      },
-      error: (e) => toast.error(e.message),
-    });
+    setReading(true);
+    try {
+      validateImportFile(file);
+      const data = await parseImportWorkbook(new Uint8Array(await file.arrayBuffer()), kind);
+      if (fileVersion.current !== version) return;
+      setFileName(file.name);
+      setRows(data);
+    } catch (e) {
+      if (fileVersion.current === version) toast.error(e instanceof Error ? e.message : "Could not read the Excel workbook.");
+    } finally {
+      if (fileVersion.current === version) setReading(false);
+    }
   }
 
   async function runImport() {
@@ -107,23 +110,23 @@ export function ImportClient() {
     }
   }
 
-  function downloadErrors() {
+  async function downloadErrors() {
     if (!result) return;
-    const csv = Papa.unparse(result.errors.map((e) => ({ row: e.row, error: e.message })), { escapeFormulae: true });
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    Object.assign(document.createElement("a"), { href: url, download: "import_errors.csv" }).click();
-    URL.revokeObjectURL(url);
+    try {
+      await exportTable("import_errors.xlsx", "Errors", [{ header: "row", key: "row", width: 12 }, { header: "error", key: "error", width: 90 }],
+        result.errors.map((e) => ({ row: e.row, error: e.message })));
+    } catch { toast.error("Could not create the Excel error report. Please try again."); }
   }
 
   const t = TEMPLATES[kind];
 
   return (
     <>
-      <PageHeader title="Import data" description="Upload a CSV to create or update students and faculty. Re-uploading is safe: existing users are updated, not duplicated." />
+      <PageHeader title="Import data" description="Upload an Excel (.xlsx) workbook to create or update students and faculty. Re-uploading updates existing users without duplicating them." />
 
       <div role="tablist" aria-label="Import type" className="mb-4 inline-flex gap-1 rounded-xl bg-muted p-1">
         {(["students", "faculty"] as Kind[]).map((k) => (
-          <button key={k} role="tab" aria-selected={kind === k} onClick={() => reset(k)} className={cn("cursor-pointer rounded-lg px-4 py-1.5 text-sm font-medium capitalize", kind === k ? "bg-card shadow-sm" : "text-muted-foreground")}>
+          <button key={k} disabled={busy || reading} role="tab" aria-selected={kind === k} onClick={() => reset(k)} className={cn("cursor-pointer rounded-lg px-4 py-1.5 text-sm font-medium capitalize", kind === k ? "bg-card shadow-sm" : "text-muted-foreground")}>
             {k}
           </button>
         ))}
@@ -131,19 +134,20 @@ export function ImportClient() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="capitalize">{kind} CSV</CardTitle>
+            <CardTitle className="capitalize">{kind} Excel workbook</CardTitle>
           <CardDescription>{t.note}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="overflow-x-auto rounded-lg bg-muted px-3 py-2 font-mono text-xs">{t.header.join(", ")}</p>
+          <p className="text-sm text-muted-foreground">Use one worksheet with headers in the first row. Maximum 2 MiB and 5,000 data rows. Keep IDs and phone numbers as text. Formulas, macros and embedded objects are not accepted.</p>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={downloadTemplate}>
               <Download className="h-4 w-4" /> Download template
             </Button>
             <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium hover:bg-accent">
               <Upload className="h-4 w-4" />
-              Choose CSV file
-              <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
+              Choose Excel file
+              <input ref={fileRef} disabled={busy || reading} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
             </label>
             {fileName && (
               <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -159,7 +163,7 @@ export function ImportClient() {
             </div>
           )}
 
-          <Button disabled={!rows || rows.length === 0} loading={busy} onClick={runImport}>
+          <Button disabled={reading || !rows || rows.length === 0} loading={busy || reading} onClick={runImport}>
             Import {rows ? rows.length : ""} {kind}
           </Button>
         </CardContent>

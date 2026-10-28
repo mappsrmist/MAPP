@@ -29,7 +29,9 @@ export function loginKeys(role: string, username: string, ip: string): ThrottleK
 /** Best-effort client IP behind Vercel / a reverse proxy. */
 export function clientIp(request: Request): string {
   const h = request.headers;
-  const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const ip = process.env.VERCEL === "1"
+    ? h.get("x-vercel-forwarded-for")?.split(",")[0] ?? "unknown"
+    : h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   return ip.trim().slice(0, 64) || "unknown";
 }
 
@@ -48,13 +50,15 @@ export async function retryAfter(keys: ThrottleKey[]): Promise<number> {
 
 export async function recordFailure(keys: ThrottleKey[]): Promise<void> {
   const admin = createAdminClient();
-  await Promise.all(
+  const results = await Promise.all(
     keys.map(({ key, max }) => admin.rpc("throttle_fail", { p_key: key, p_max: max, p_window_secs: WINDOW, p_lock_secs: LOCK })),
   );
+  if (results.some(({ error }) => error)) throw new Error("throttle unavailable");
 }
 
 /** A successful sign-in clears only the per-account counters, never the IP one. */
 export async function clearFailures(keys: ThrottleKey[]): Promise<void> {
   const admin = createAdminClient();
-  await Promise.all(keys.filter((k) => !k.key.startsWith("ip:")).map(({ key }) => admin.rpc("throttle_clear", { p_key: key })));
+  const results = await Promise.all(keys.filter((k) => !k.key.startsWith("ip:")).map(({ key }) => admin.rpc("throttle_clear", { p_key: key })));
+  if (results.some(({ error }) => error)) throw new Error("throttle unavailable");
 }

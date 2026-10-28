@@ -2,21 +2,24 @@ import { z } from "zod";
 import { CADRES, type Cadre } from "./config";
 
 const trimmed = (label: string, max = 200) =>
-  z.string({ error: `${label} is required` }).trim().min(1, `${label} is required`).max(max);
+  z.string({ error: `${label} is required` }).trim().min(1, `${label} is required`).max(max)
+    .regex(/^[^\u0000-\u001f\u007f]*$/, "Control characters are not allowed")
+    .transform((value) => value.normalize("NFC"));
 
-export const loginSchema = z.object({
+export const loginSchema = z.strictObject({
   role: z.enum(["student", "faculty", "admin"]),
   username: z.string().trim().min(1, "Username is required").max(200),
   password: z.string().min(1, "Password is required").max(200),
 });
 
 export const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Enter your current password"),
+  .strictObject({
+    currentPassword: z.string().min(1, "Enter your current password").max(200),
     newPassword: z
       .string()
       .min(10, "Use at least 10 characters")
       .max(72, "Use at most 72 characters")
+      .refine((value) => new TextEncoder().encode(value).length <= 72, "Use at most 72 UTF-8 bytes")
       .regex(/[A-Za-z]/, "Include at least one letter")
       .regex(/[0-9]/, "Include at least one number"),
   })
@@ -33,7 +36,7 @@ const optional = z
   .optional()
   .transform((v) => (v ? v : null));
 
-export const studentRowSchema = z.object({
+export const studentRowSchema = z.strictObject({
   reg_no: trimmed("reg_no", 30)
     .transform((v) => v.toUpperCase())
     .refine((v) => /^[A-Z0-9]{6,30}$/.test(v), "reg_no must be 6-30 letters/digits with no spaces"),
@@ -51,7 +54,7 @@ const cadreSchema = z
   .transform((v) => (v === "ASSOCIATE_CHAIR" || v === "ASSOC_CHAIR" ? "ASSOC_CHAIR" : v))
   .refine((v): v is Cadre => (CADRES as readonly string[]).includes(v), "cadre must be HOD, ASSOC_CHAIR or OTHER");
 
-export const facultyRowSchema = z.object({
+export const facultyRowSchema = z.strictObject({
   // the employee ID is the initial password, so it must meet the minimum password length
   emp_id: trimmed("emp_id", 40).refine((v) => v.length >= 6, "emp_id must be at least 6 characters (it is the initial password)"),
   name: trimmed("name"),
@@ -77,13 +80,16 @@ export const facultyRowSchema = z.object({
 });
 export type FacultyImportRow = z.infer<typeof facultyRowSchema>;
 
-export const importRequestSchema = z.object({
+export const importRequestSchema = z.strictObject({
   type: z.enum(["students", "faculty"]),
-  offset: z.number().int().min(0).default(0),
-  rows: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
-});
+  offset: z.number().int().min(0).max(4999).default(0),
+  rows: z.array(z.record(
+    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "designation", "cadre", "phone", "venue", "domains"].includes(key)),
+    z.string().max(500).regex(/^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/),
+  )).min(1).max(100),
+}).refine((v) => v.offset + v.rows.length <= 5000, "Import at most 5,000 rows.");
 
-export const resetPasswordSchema = z.object({ profileId: z.uuid() });
+export const resetPasswordSchema = z.strictObject({ profileId: z.uuid() });
 
 // -------------------------------------------------------------------- batch
 const phone = z
