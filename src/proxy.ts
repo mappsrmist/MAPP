@@ -48,6 +48,13 @@ export async function proxy(request: NextRequest) {
     return isPortal || isForce ? redirect("/login") : response;
   }
 
+  // Fast path: for sub-route navigations within portal sections (e.g. /student/minor -> /student/application),
+  // skip the redundant profiles DB lookup in middleware. Each portal layout already strictly
+  // enforces role isolation and password-change flags via requireRole().
+  if (isPortal && path !== "/" && path !== "/login" && !isForce) {
+    return response;
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, must_change_password")
