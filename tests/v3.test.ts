@@ -7,7 +7,6 @@ vi.mock("server-only", () => ({}));
 import { resolveLogin } from "@/lib/auth-utils";
 import { loginKeys } from "@/lib/server/throttle";
 import { BATCH_COLUMNS, GUIDE_EMP_COLUMN, buildSheetRows, guideTitle, sheetsFromDetails } from "@/lib/batch-sheet";
-import { buildApplicationRows } from "@/lib/application-rows";
 import { buildBatchWorkbook } from "@/lib/excel";
 import { IMPORT_HEADERS } from "@/lib/import-excel";
 import { advisorRowSchema, facultyRowSchema, importRequestSchema, loginSchema, studentActionSchema } from "@/lib/validators";
@@ -131,25 +130,6 @@ describe("batch sheet: Project Title and Student Mobile No.", () => {
     expect(ws.getRow(2).values).toEqual([undefined, GUIDE_EMP_COLUMN, ...BATCH_COLUMNS]);
     expect(ws.getCell("A3").value).toBe("E1");
     expect(ws.getCell("K3").value).toBe("Alpha");
-  });
-});
-
-describe("faculty Applications page rows", () => {
-  const batches = [
-    { id: "b1", batch_no: 1, batch_members: [{ slot: 1, student_id: "a", section: "A", advisor_name: "x", contact_number: "9", srm_mail: "m" }, { slot: 2, student_id: "b", section: "A", advisor_name: "x", contact_number: "9", srm_mail: "m" }] },
-    { id: "b2", batch_no: 2, batch_members: [{ slot: 1, student_id: "c", section: "A", advisor_name: "x", contact_number: "9", srm_mail: "m" }] },
-    { id: "b3", batch_no: 3, batch_members: [{ slot: 1, student_id: "d", section: "A", advisor_name: "x", contact_number: "9", srm_mail: "m" }, { slot: 2, student_id: "e", section: "A", advisor_name: "x", contact_number: "9", srm_mail: "m" }] },
-  ] as BatchRow[];
-  const people = Object.fromEntries(["a", "b", "c", "d", "e"].map((id) => [id, { name: id.toUpperCase(), reg_no: `RA${id}` }]));
-  it("lists formed teams with title, SDG, problem flag, own mobiles and status; blank when not started", () => {
-    const rows = buildApplicationRows(batches, people, [
-      { student1_id: "b", student2_id: "a", project_title: "T", sdg_goal: "1. No Poverty", problem_by_guide: true, student1_mobile: "111", student2_mobile: "222", status: "submitted" },
-    ]);
-    expect(rows).toHaveLength(2); // the one-student batch is not a team
-    expect(rows[0]).toMatchObject({ batchNo: 1, title: "T", sdg: "1. No Poverty", problem: "Yes", status: "Submitted" });
-    expect(rows[0].members.map((m) => [m.regNo, m.mobile])).toEqual([["RAa", "222"], ["RAb", "111"]]);
-    expect(rows[1]).toMatchObject({ batchNo: 3, title: "", sdg: "", problem: "", status: "Not started" });
-    expect(rows[1].members.map((m) => m.mobile)).toEqual(["", ""]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { ClipboardList, GraduationCap, Layers, UsersRound } from "lucide-react";
+import { GraduationCap, Layers, UsersRound } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/portal-shell";
 import { redirect } from "next/navigation";
 import { FACULTY_COLS } from "@/lib/config";
@@ -18,7 +18,6 @@ export default async function FacultyLayout({ children }: { children: React.Reac
   const nav: NavItem[] = [
     { href: "/faculty/approached", label: "Students Approached", icon: <UsersRound className="h-4 w-4" /> },
     { href: "/faculty/batches", label: "Batch Grouping", icon: <Layers className="h-4 w-4" /> },
-    { href: "/faculty/applications", label: "Applications", icon: <ClipboardList className="h-4 w-4" /> },
     // only faculty mapped to at least one section ever see this item
     ...(isAdvisor ? [{ href: "/faculty/advisor", label: "Faculty Advisor", icon: <GraduationCap className="h-4 w-4" /> }] : []),
   ];

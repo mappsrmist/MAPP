@@ -6,7 +6,7 @@ Upgrade order: apply `supabase/migrations/0009_v3.sql` **before** deploying the 
 
 ### A. Application title and mobile numbers
 - The columns and `save_application` already persisted `project_title`, `sdg_goal`, `problem_by_guide` and both students' mobiles; the gap was that nobody read them. A DB test now saves, reloads (as the partner) and reads them as the guide.
-- Faculty: new **Applications** page (`Batch | Team | Project Title | SDG Goal | Problem by Guide | Student Mobile No(s) | Status`, read-only, searchable, 10/page, Excel download). **Students Approached** shows Project Title and Mobile No. on accepted rows and in its accepted-students download.
+- Faculty: **Students Approached** shows Project Title and Mobile No. on accepted rows and in its accepted-students download. In **Batch Grouping**, student SRM Mail ID is prefilled from the student's email rather than the guide's email.
 - `request_details_v` gained `project_title`, `student_mobile` and `fa_name`.
 - Faculty Excel and admin exports: `Batch No. | Name | Registration No. | Section | Faculty Advisor Name | Phone No. | SRM Mail ID | Student Mobile No. | Project Title | Guide Name`. Each student's own mobile; Project Title merged over the batch's two rows like Batch No.; blank when the form is not filled. The title row is now `Guide: <name> — Emp ID: <id>` (no cadre).
 
@@ -22,7 +22,7 @@ Upgrade order: apply `supabase/migrations/0009_v3.sql` **before** deploying the 
 - **Overview** now shows only Total Students, Total Faculty, Minor, MOOC Opted, Not Opted (+ a small Exempt count), the **MOOC Opted** and **Not Opted** tables, and a **Section** dropdown with the advisor beside it. No filter, no Department. Tables: `Reg No | Name | Section | Student SRM Mail | Faculty Advisor Name`. `admin_stats()` returns just the six counts.
 - **Remove student** (soft delete) and **Exempt** on Not Opted, per row and in bulk, with confirmation; `admin_remove_students`, `admin_restore_students`, `admin_set_exempt` are admin-only, work while frozen and are audited. Removal frees seats, dissolves the batch/application, deletes the student's requests, hides them everywhere, and bans the Auth login (`/api/admin/students`). The DB also refuses inactive students (`app_role()`, `_assert_role`), so a failed ban call cannot leave a usable account. **Settings** lists Removed students (Restore) and Exempt students (Undo exempt).
 - **Faculty Advisors page** (manual add with live name match, replace prompt, Edit/Remove, students-in-section count) and a third **Faculty Advisors** tab in Import (`emp_id, section`; row errors for unknown employee, unknown section, duplicates; idempotent). The mapping fills a blank Faculty Advisor Name in Batch Grouping (form and `save_batch`); typed names are kept.
-- The per-faculty Freeze and password Reset buttons moved from Overview to **Settings & Freeze**.
+- The faculty table (Emp ID, Name, Domain, Filled, Available seats, per-faculty Freeze, password Reset) moved off the Overview to its own **Faculty** page in the admin sidebar.
 - **Login:** the Admin tab is gone. The admin username on the Faculty tab signs in as admin and goes to `/admin`; the Student tab can never reach it. Same generic error for every failure; the admin account has a stricter lockout (3 failures per IP, 10 overall).
 
 ### D. Designation removed

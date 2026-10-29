@@ -20,7 +20,8 @@ type Slot = "m1" | "m2";
 /**
  * Group (or edit) one batch. Each of the two students has their own Section, Faculty Advisor Name, Contact Number
  * and SRM Mail ID. The advisor name is filled from the section -> Faculty Advisor mapping (blank when the section has
- * no advisor yet); contact / mail are prefilled from the faculty's profile. Everything stays editable.
+ * no advisor yet); mail is prefilled from the student's SRM mail; contact is prefilled from the faculty's profile.
+ * Everything stays editable.
  */
 export function BatchFormDialog({
   batchNo,
@@ -42,16 +43,26 @@ export function BatchFormDialog({
   const supabase = React.useMemo(() => createClient(), []);
   const members = existing ? [...existing.batch_members].sort((a, b) => a.slot - b.slot) : [];
   const byId = new Map(options.map((o) => [o.student_id, o]));
-  // the last advisor name we filled in per slot, so a manual override is never overwritten
+  // the last advisor name and mail we filled in per slot, so a manual override is never overwritten
   const autoAdvisor = React.useRef<Record<Slot, string>>({ m1: "", m2: "" });
+  const autoMail = React.useRef<Record<Slot, string>>({ m1: "", m2: "" });
 
-  const blank = (i: number) => ({
-    student: members[i]?.student_id ?? "",
-    section: members[i]?.section ?? "",
-    advisor: members[i]?.advisor_name ?? "",
-    contact: members[i]?.contact_number ?? faculty.phone ?? "",
-    mail: members[i]?.srm_mail ?? faculty.srm_email,
-  });
+  const blank = (i: number) => {
+    const sid = members[i]?.student_id ?? "";
+    const st = sid ? byId.get(sid) : undefined;
+    const advisor = members[i]?.advisor_name || st?.fa_name || "";
+    const mail = members[i]?.srm_mail || st?.student_email || "";
+    const slotKey: Slot = i === 0 ? "m1" : "m2";
+    autoAdvisor.current[slotKey] = advisor;
+    autoMail.current[slotKey] = mail;
+    return {
+      student: sid,
+      section: members[i]?.section || st?.student_section || "",
+      advisor,
+      contact: members[i]?.contact_number || faculty.phone || "",
+      mail,
+    };
+  };
 
   const {
     control,
@@ -97,13 +108,22 @@ export function BatchFormDialog({
             {...pick}
             onChange={(ev) => {
               void pick.onChange(ev);
-              // a freshly chosen student brings their own section unless one was already typed
-              const st = byId.get(ev.target.value);
-              if (st?.student_section && !getValues(`${slot}.section`)) setValue(`${slot}.section`, st.student_section);
-              const current = getValues(`${slot}.advisor`);
-              if (!current || current === autoAdvisor.current[slot]) {
-                autoAdvisor.current[slot] = st?.fa_name ?? "";
-                setValue(`${slot}.advisor`, st?.fa_name ?? "");
+              const sid = ev.target.value;
+              const st = byId.get(sid);
+              if (st?.student_section && !getValues(`${slot}.section`)) {
+                setValue(`${slot}.section`, st.student_section);
+              }
+              const currentAdvisor = getValues(`${slot}.advisor`);
+              if (!currentAdvisor || currentAdvisor === autoAdvisor.current[slot]) {
+                const nextAdvisor = st?.fa_name ?? "";
+                autoAdvisor.current[slot] = nextAdvisor;
+                setValue(`${slot}.advisor`, nextAdvisor);
+              }
+              const currentMail = getValues(`${slot}.mail`);
+              if (!currentMail || currentMail === autoMail.current[slot] || currentMail === faculty.srm_email) {
+                const nextMail = st?.student_email ?? "";
+                autoMail.current[slot] = nextMail;
+                setValue(`${slot}.mail`, nextMail);
               }
             }}
           >
