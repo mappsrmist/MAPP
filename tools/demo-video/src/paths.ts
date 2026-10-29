@@ -10,4 +10,4 @@ export const CACHE_DIR = at("../.cache/");
 /** Final videos land in <repo>/demo-output. */
 export const OUT_DIR = at("../../../demo-output/");
 export const RAW_DIR = at("../../../demo-output/raw/");
-export const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
+export const BASE_URL = process.env.BASE_URL ?? "http://localhost:3210";

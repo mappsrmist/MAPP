@@ -4,18 +4,23 @@
  */
 export function pageOverlay() {
   const w = window as unknown as { __demoError?: string; __demoX?: number; __demoY?: number };
+  let listening = false;
   const install = () => {
+    // React hydration can drop nodes it did not render, so re-attach whenever the cursor goes missing
     if (document.getElementById("__demo-cursor")) return;
     const c = document.createElement("div");
     c.id = "__demo-cursor";
     c.innerHTML =
       '<svg width="28" height="28" viewBox="0 0 24 24"><path d="M4 2l16 9-7 1.6L9.6 20z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
     Object.assign(c.style, { position: "fixed", left: "0", top: "0", zIndex: "2147483647", pointerEvents: "none", transform: `translate(${w.__demoX ?? -40}px, ${w.__demoY ?? -40}px)` });
-    document.documentElement.appendChild(c);
+    document.body.appendChild(c);
+    if (listening) return;
+    listening = true;
     document.addEventListener("mousemove", (e) => {
       w.__demoX = e.clientX;
       w.__demoY = e.clientY;
-      c.style.transform = `translate(${e.clientX - 3}px, ${e.clientY - 2}px)`;
+      const cur = document.getElementById("__demo-cursor");
+      if (cur) cur.style.transform = `translate(${e.clientX - 3}px, ${e.clientY - 2}px)`;
     }, true);
     document.addEventListener("mousedown", (e) => {
       const r = document.createElement("div");
@@ -35,4 +40,11 @@ export function pageOverlay() {
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
   else install();
+  setInterval(() => document.body && install(), 250);
 }
+
+/**
+ * The overlay as init-script source. tsx/esbuild wrap named functions with a `__name` helper that does not exist in
+ * the page, so the serialized function gets a no-op stand-in.
+ */
+export const overlayScript = `var __name = (f) => f; (${pageOverlay.toString()})();`;

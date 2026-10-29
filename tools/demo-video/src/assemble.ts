@@ -5,12 +5,13 @@ import { promisify } from "node:util";
 import { renderCard } from "./card";
 import { OUT_DIR } from "./paths";
 import { buildTimeline, toSrt, type StepLog, type TimelineEntry } from "./timeline";
+import { findMarkerSec } from "./marker";
 import { synth } from "./tts";
 
 const run = promisify(execFile);
 
 const CAPTION_STYLE =
-  "FontName=Segoe UI,FontSize=15,PrimaryColour=&H00FFFFFF,BackColour=&H30101418,BorderStyle=4,Outline=10,Shadow=0,MarginV=28,Alignment=2";
+  "FontName=Segoe UI,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&H40101418,BackColour=&H40101418,BorderStyle=3,Outline=8,Shadow=0,MarginV=22,Alignment=2";
 const VIDEO_FMT = "fps=30,scale=1920:1080,setsar=1,format=yuv420p";
 
 /**
@@ -62,7 +63,7 @@ export function ffmpegArgs(o: {
 /** Writes demo-output/MAPP-<name>-Demo.mp4 (+ .srt) from a recording. */
 export async function assemble(
   name: "Student" | "Faculty",
-  rec: { videoPath: string; logs: StepLog[]; trimStartSec: number },
+  rec: { videoPath: string; logs: StepLog[]; trimStartSec: number; markSec: number },
   cards: { title: string; subtitle: string; introNarration: string; outroTitle: string; outroSubtitle: string },
 ): Promise<string> {
   const stem = `MAPP-${name}-Demo`;
@@ -75,8 +76,11 @@ export async function assemble(
   await renderCard(cards.outroTitle, cards.outroSubtitle, outro);
   const introAudio = await synth(cards.introNarration);
   const out = `${stem}.mp4`;
+  // the recorder's clock vs the video's clock, measured from the sync marker frame
+  const offset = (await findMarkerSec(rec.videoPath)) - rec.markSec;
+  console.log(`video clock offset: ${offset.toFixed(2)}s`);
   const args = ffmpegArgs({
-    intro, outro, introAudio: introAudio.path, video: rec.videoPath, trimStartSec: rec.trimStartSec,
+    intro, outro, introAudio: introAudio.path, video: rec.videoPath, trimStartSec: Math.max(0, rec.trimStartSec + offset),
     introSec: Math.max(5, Math.ceil(introAudio.sec + 1.2)), outroSec: 4, srt, out, timeline,
   });
   await run("ffmpeg", args, { cwd: OUT_DIR, maxBuffer: 64 * 1024 * 1024 });

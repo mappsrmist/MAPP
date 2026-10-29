@@ -28,7 +28,8 @@ async function skipFirstLogin(admin: SupabaseClient, username: string) {
   await must(`flag for ${username}`, admin.from("profiles").update({ must_change_password: false }).eq("id", id));
 }
 
-export async function seed() {
+/** `advisorFirstLogin`: keep the advisor on the initial password (the faculty video shows that first login). */
+export async function seed({ advisorFirstLogin = true } = {}) {
   const admin = adminClient();
   await preflight(admin);
 
@@ -38,7 +39,7 @@ export async function seed() {
   }
   await upsertAdvisor(admin, advisorRowSchema.parse({ emp_id: ADVISOR.emp_id, section: SECTION }));
 
-  for (const f of ALL_FACULTY) if (f !== ADVISOR) await skipFirstLogin(admin, f.srm_email);
+  for (const f of ALL_FACULTY) if (f !== ADVISOR || !advisorFirstLogin) await skipFirstLogin(admin, f.srm_email);
   for (const s of ALL_STUDENTS) if (s !== STUDENT_A) await skipFirstLogin(admin, s.reg_no);
 
   const advisorId = await facultyId(admin, ADVISOR.emp_id);

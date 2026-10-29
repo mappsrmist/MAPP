@@ -1,7 +1,8 @@
 import { chromium, type Locator, type Page } from "playwright";
 import { renameSync } from "node:fs";
 import { join } from "node:path";
-import { pageOverlay } from "./cursor";
+import { overlayScript } from "./cursor";
+import { MARKER_OFF, MARKER_ON } from "./marker";
 import { RAW_DIR } from "./paths";
 import type { StepLog } from "./timeline";
 import { synth } from "./tts";
@@ -16,7 +17,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Records `steps` in a 1920x1080 light-theme browser. Each step is held until its narration has finished.
  * The footage before the first step (blank page, first load of `startUrl`) is excluded via `trimStartSec`.
  */
-export async function record(name: string, startUrl: string, steps: Step[]): Promise<{ videoPath: string; logs: StepLog[]; trimStartSec: number }> {
+export async function record(name: string, startUrl: string, steps: Step[]): Promise<{ videoPath: string; logs: StepLog[]; trimStartSec: number; markSec: number }> {
   const audio = await Promise.all(steps.map((s) => synth(s.narration)));
   const browser = await chromium.launch();
   const context = await browser.newContext({
@@ -26,7 +27,7 @@ export async function record(name: string, startUrl: string, steps: Step[]): Pro
     acceptDownloads: true,
     recordVideo: { dir: RAW_DIR, size: { width: 1920, height: 1080 } },
   });
-  await context.addInitScript(pageOverlay);
+  await context.addInitScript({ content: overlayScript });
   const page = await context.newPage();
   const t0 = Date.now();
   const now = () => (Date.now() - t0) / 1000;
@@ -36,6 +37,13 @@ export async function record(name: string, startUrl: string, steps: Step[]): Pro
     await page.goto(startUrl);
     await page.mouse.move(960, 540);
     await sleep(800);
+    // a magenta flash whose frame the assembler finds, to map this clock onto the video's clock
+    await page.evaluate(MARKER_ON);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const markSec = now();
+    await sleep(500);
+    await page.evaluate(MARKER_OFF);
+    await sleep(700);
     const trimStartSec = now();
     for (const [i, step] of steps.entries()) {
       const startSec = now();
@@ -51,7 +59,7 @@ export async function record(name: string, startUrl: string, steps: Step[]): Pro
     await context.close();
     const videoPath = join(RAW_DIR, `${name}.webm`);
     renameSync(await video.path(), videoPath);
-    return { videoPath, logs, trimStartSec };
+    return { videoPath, logs, trimStartSec, markSec };
   } catch (e) {
     failure = e as Error;
     await page.screenshot({ path: join(RAW_DIR, `${name}-failure.png`) }).catch(() => {});
