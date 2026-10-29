@@ -5,10 +5,10 @@ const MAX_EXPANDED_BYTES = 20 * 1024 * 1024;
 export type ImportKind = "students" | "faculty" | "advisors";
 export const IMPORT_HEADERS: Record<ImportKind, string[]> = {
   students: ["reg_no", "name", "dept", "section", "email"],
-  faculty: ["emp_id", "name", "srm_email", "phone", "venue", "domains", "cadre"],
+  faculty: ["emp_id", "name", "srm_email", "phone", "venue", "domains", "cadre", "designation"],
   advisors: ["emp_id", "section"],
 };
-const OPTIONAL_HEADERS = new Set(["email", "phone", "venue", "domains"]);
+const OPTIONAL_HEADERS = new Set(["email", "phone", "venue", "domains", "designation"]);
 
 export function validateImportFile(file: { name: string; size: number }) {
   if (!/\.xlsx$/i.test(file.name)) throw new Error("Choose an Excel .xlsx file.");

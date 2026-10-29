@@ -107,12 +107,12 @@ const APP = [
   "Partner Name", "", "B", "partner@srmist.edu.in", "9123456780",
 ] as const;
 let regSeq = 0;
-const saveApp = (s: string, over: Partial<Record<number, unknown>> = {}, submit = false) => {
+const saveApp = (s: string, over: Partial<Record<number, unknown>> = {}, submit = false, projectType: string | null = "research") => {
   const args: unknown[] = [...APP];
   args[6] = `RC${String(++regSeq).padStart(7, "0")}`; // unique per call: a reg no may appear in one application only
   Object.entries(over).forEach(([i, v]) => (args[Number(i)] = v));
   return as(s, async (q) =>
-    (await q("select public.save_application($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) as id", [...args, submit])).rows[0].id as string,
+    (await q("select public.save_application($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) as id", [...args, submit, projectType])).rows[0].id as string,
   );
 };
 const getApp = (s: string) => as(s, async (q) => (await q("select * from public.get_application()")).rows[0]);
@@ -126,7 +126,8 @@ beforeAll(async () => {
   await admin.connect();
   await admin.query(STUB);
   const dir = join(process.cwd(), "supabase", "migrations");
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+  // Historical workflow snapshot; mooc.test.ts verifies the full current migration chain.
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql") && f < "0012").sort()) {
     await admin.query(readFileSync(join(dir, f), "utf8"));
   }
 }, 120_000);
@@ -171,6 +172,14 @@ describe("A: application title and mobile numbers persist and reach the guide", 
     const s1 = await accepted(f);
     const s2 = await accepted(f);
     await group(f, 1, s1, s2);
+    await admin.query("update public.faculty set designation=$1 where id=$2", ["Assistant Professor", f]);
+    for (const projectType of ["research", "product", "multidisciplinary"]) {
+      await saveApp(s1, {}, false, projectType);
+      expect((await getApp(s2)).project_type).toBe(projectType);
+    }
+    await expect(saveApp(s1, {}, false, "other")).rejects.toThrow(/project type/i);
+    await expect(saveApp(s1, {}, true, null)).rejects.toThrow(/project type/i);
+    await saveApp(s1, { 0: null, 4: null }, false, null);
     const blank = (await admin.query("select project_title, student_mobile from public.request_details_v where student_id=$1 and faculty_id=$2", [s1, f])).rows[0];
     expect(blank).toEqual({ project_title: null, student_mobile: null }); // not filled yet: blank, not an error
 
@@ -181,7 +190,7 @@ describe("A: application title and mobile numbers persist and reach the guide", 
       student1_mobile: "9876543210", student2_mobile: "9123456780", status: "draft",
     });
     const reload = await getApp(s2);
-    expect(reload).toMatchObject({ project_title: "Smart Campus v3", s1_mobile: "9876543210", s2_mobile: "9123456780", problem_by_guide: false });
+    expect(reload).toMatchObject({ project_type: "research", guide_designation: "Assistant Professor", project_title: "Smart Campus v3", s1_mobile: "9876543210", s2_mobile: "9123456780", problem_by_guide: false });
 
     const seen = await as(f, async (q) => (await q("select student_id, project_title, student_mobile from public.request_details_v where status='accepted'")).rows);
     expect(seen.map((r) => [r.student_id, r.project_title, r.student_mobile]).sort()).toEqual(
@@ -429,10 +438,10 @@ describe("C3: remove and exempt students", () => {
   });
 });
 
-describe("D: no designation anywhere", () => {
-  it("drops the column and no function returns it", async () => {
-    expect((await admin.query("select 1 from information_schema.columns where table_schema='public' and column_name ilike '%designation%'")).rows).toHaveLength(0);
-    expect((await admin.query("select proname from pg_proc where pronamespace='public'::regnamespace and exists (select 1 from unnest(proargnames) a where a ilike '%designation%')")).rows).toHaveLength(0);
+describe("D: optional designation on applications", () => {
+  it("restores designation without changing faculty seat rules", async () => {
+    expect((await admin.query("select 1 from information_schema.columns where table_schema='public' and column_name ilike '%designation%'")).rows).toHaveLength(1);
+    expect((await admin.query("select proname from pg_proc where pronamespace='public'::regnamespace and exists (select 1 from unnest(proargnames) a where a ilike '%designation%')")).rows).toHaveLength(1);
     const f = await mkFaculty("HOD");
     expect((await admin.query("select cadre, total_seats from public.faculty where id=$1", [f])).rows[0]).toEqual({ cadre: "HOD", total_seats: 6 }); // cadre still drives seats
     const s = await mkStudent();

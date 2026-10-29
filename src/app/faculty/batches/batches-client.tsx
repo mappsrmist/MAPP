@@ -149,8 +149,8 @@ export function BatchesClient() {
                       <td className="border border-slate-400/60 px-3 py-2">{r.phone}</td>
                       <td className="border border-slate-400/60 px-3 py-2">{r.mail}</td>
                       <td className="border border-slate-400/60 px-3 py-2">{r.studentMobile}</td>
-                      {r.first && (
-                        <td rowSpan={2} className="border border-slate-400/60 px-3 py-2 align-middle">
+                      {(r.first || sheet[i - 1]?.projectTitle !== r.projectTitle) && (
+                        <td rowSpan={r.first && sheet[i + 1]?.projectTitle === r.projectTitle ? 2 : 1} className="border border-slate-400/60 px-3 py-2 align-middle">
                           {r.projectTitle}
                         </td>
                       )}

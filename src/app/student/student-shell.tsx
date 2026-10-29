@@ -57,7 +57,7 @@ export function StudentShell({ userId, name, regNo, choice, accepted, frozen, ch
       href: "/student/minor",
       label: "Minor",
       icon: <FlaskConical className="h-4 w-4" />,
-      lockedMessage: state.choice === "exempt" ? MSG.EXEMPT : state.choice === "mooc" ? MSG.MINOR_LOCKED : undefined,
+      lockedMessage: state.choice === "exempt" ? MSG.EXEMPT : (state.choice === "mooc" || state.choice === "mooc_pending") ? MSG.MINOR_LOCKED : undefined,
     },
     {
       href: "/student/application",

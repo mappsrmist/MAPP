@@ -72,10 +72,10 @@ export function buildSheetRows(
     .forEach((b) => {
       const members = [...b.batch_members].sort((x, y) => x.slot - y.slot);
       if (members.length !== 2) return;
-      // one application per team; a team that has not filled the form yet leaves these cells blank
-      const app = (extras.applications ?? []).find((a) => members.some((m) => m.student_id === a.student1_id || m.student_id === a.student2_id));
+      // Grouping can combine students from different application teams.
       members.forEach((m, i) => {
         const st = students[m.student_id];
+        const studentApp = (extras.applications ?? []).find((a) => m.student_id === a.student1_id || m.student_id === a.student2_id);
         rows.push({
           batchNo: b.batch_no,
           batchLabel: `B${b.batch_no}`,
@@ -85,8 +85,8 @@ export function buildSheetRows(
           advisor: m.advisor_name,
           phone: m.contact_number,
           mail: m.srm_mail,
-          studentMobile: app ? ((m.student_id === app.student1_id ? app.student1_mobile : app.student2_mobile) ?? "") : "",
-          projectTitle: app?.project_title ?? "",
+          studentMobile: studentApp ? ((m.student_id === studentApp.student1_id ? studentApp.student1_mobile : studentApp.student2_mobile) ?? "") : "",
+          projectTitle: studentApp?.project_title ?? "",
           guideName,
           guideEmpId: extras.empId ?? "",
           first: i === 0,

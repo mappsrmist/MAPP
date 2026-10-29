@@ -64,6 +64,7 @@ export const facultyRowSchema = z.strictObject({
     .transform((v) => v.toLowerCase())
     .refine((v) => !v.endsWith("mapp.local"), "srm_email uses a reserved domain"),
   cadre: cadreSchema,
+  designation: optional,
   phone: optional,
   venue: optional,
   domains: z
@@ -91,7 +92,7 @@ export const importRequestSchema = z.strictObject({
   type: z.enum(["students", "faculty", "advisors"]),
   offset: z.number().int().min(0).max(4999).default(0),
   rows: z.array(z.record(
-    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains"].includes(key)),
+    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains", "designation"].includes(key)),
     z.string().max(500).regex(/^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/),
   )).min(1).max(100),
 }).refine((v) => v.offset + v.rows.length <= 5000, "Import at most 5,000 rows.");
@@ -140,6 +141,7 @@ const student = {
 
 /** Strict rules used on Submit (Save draft only sends what is filled in; the database re-validates both). */
 export const applicationSubmitSchema = z.object({
+  project_type: z.enum(["research", "product", "multidisciplinary"], { error: "Select a project type" }),
   title: trimmed("Project title", 200),
   sdg: trimmed("SDG goal", 100).refine((v) => SDG_PATTERN.test(v), "Start with the SDG number (1–17), e.g. 1. No Poverty"),
   problem: z.enum(["yes", "no"], { error: "Select Yes or No" }),

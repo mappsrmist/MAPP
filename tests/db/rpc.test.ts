@@ -108,7 +108,8 @@ beforeAll(async () => {
   admin = await connect();
   await admin.query(STUB);
   const dir = join(process.cwd(), "supabase", "migrations");
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+  // Historical workflow snapshot; mooc.test.ts verifies the full current migration chain.
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql") && f < "0012").sort()) {
     await admin.query(readFileSync(join(dir, f), "utf8"));
   }
 }, 120_000);

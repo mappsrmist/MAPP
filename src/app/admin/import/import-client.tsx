@@ -19,8 +19,8 @@ const TEMPLATES: Record<Kind, { header: string[]; sample: string[]; note: string
   },
   faculty: {
     header: IMPORT_HEADERS.faculty,
-    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI;Machine Learning", "OTHER"],
-    note: "cadre: HOD, ASSOC_CHAIR or OTHER (it sets the seat and batch counts and is never shown). domains: separate with semicolons. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
+    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI;Machine Learning", "OTHER", "Assistant Professor"],
+    note: "designation: optional academic title, shown on application forms. cadre: HOD, ASSOC_CHAIR or OTHER (it sets the seat and batch counts and is never shown). domains: separate with semicolons. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
   },
   advisors: {
     header: IMPORT_HEADERS.advisors,

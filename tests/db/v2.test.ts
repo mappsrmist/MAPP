@@ -161,7 +161,7 @@ const saveApp = (s: string, over: Partial<Record<number, unknown>> = {}, submit 
   args[6] = `RC${String(++regSeq).padStart(7, "0")}`; // unique per call: a reg no may appear in one application only
   Object.entries(over).forEach(([i, v]) => (args[Number(i)] = v));
   return as(s, async (q) =>
-    (await q("select public.save_application($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) as id", [...args, submit])).rows[0].id as string,
+    (await q("select public.save_application($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) as id", [...args, submit, "research"])).rows[0].id as string,
   );
 };
 const getApp = (s: string) => as(s, async (q) => (await q("select * from public.get_application()")).rows[0]);
@@ -175,7 +175,8 @@ beforeAll(async () => {
   await admin.connect();
   await admin.query(STUB);
   const dir = join(process.cwd(), "supabase", "migrations");
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+  // Historical workflow snapshot; mooc.test.ts verifies the full current migration chain.
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql") && f < "0012").sort()) {
     await admin.query(readFileSync(join(dir, f), "utf8"));
   }
 }, 120_000);

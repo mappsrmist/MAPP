@@ -117,6 +117,7 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   const wide = c2 * 2;
 
   row([{ text: "PROJECT TITLE *", sub: "(21CSP302L - MINOR PROJECT)", font: bold, size: 13, w: c1 }, { text: val(form.project_title), w: wide }], 60);
+  row([{ text: "Project Type", w: c1 }, { text: form.project_type ? { research: "Research", product: "Product", multidisciplinary: "Multidisciplinary" }[form.project_type] : "", w: wide }]);
   row([{ text: "Sustainable Development Goal (SDG)", w: c1 }, { text: val(form.sdg_goal), w: wide }]);
   row([
     { text: "Problem Statement by Guide", w: c1 },
@@ -139,7 +140,7 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   row([{ text: "Guide Details", font: bold, center: true, w: width }], 20);
   const guide = (label: string, v: string, minH = 26) => row([{ text: label, w: c1 }, { text: v, w: wide }], minH);
   guide("Guide Name / Emp ID", [val(form.guide_name), val(form.guide_emp_id)].filter(Boolean).join(" / "));
-  guide("Department", val(form.guide_department));
+  guide("Department / Designation", [val(form.guide_department), val(form.guide_designation)].filter(Boolean).join(" / "));
   guide("Contact Number", val(form.guide_phone));
   guide("Signature of the Guide", "", 34);
 

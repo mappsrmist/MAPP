@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Info } from "lucide-react";
+import { CheckCircle2, Clock, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Field, Input } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,14 @@ import { ConfirmDialog, MessageDialog } from "@/components/ui/dialog";
 import { useGlobalFreeze } from "@/components/freeze";
 import { MOOC_IMPORTANT, MOOC_RULES, MOOC_TITLE, MSG } from "@/lib/config";
 import { createClient } from "@/lib/supabase/client";
-import type { StudentChoice } from "@/lib/types";
+import { useRealtime } from "@/lib/hooks";
+import type { MoocRequest, StudentChoice } from "@/lib/types";
 
-export function MoocClient({ choice }: { choice: StudentChoice }) {
+export function MoocClient({ choice, request }: { choice: StudentChoice; request: MoocRequest | null }) {
   const router = useRouter();
   const frozen = useGlobalFreeze();
   const [cgpa, setCgpa] = React.useState("");
-  const eligible = cgpa.trim() !== "" && Number.isFinite(Number(cgpa)) && Number(cgpa) > 9 && Number(cgpa) <= 10;
+  const eligible = cgpa.trim() !== "" && Number.isFinite(Number(cgpa)) && Number(cgpa) >= 9 && Number(cgpa) <= 10;
   const [agree, setAgree] = React.useState(false);
   const [confirm, setConfirm] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
@@ -33,7 +34,14 @@ export function MoocClient({ choice }: { choice: StudentChoice }) {
     setSuccess(true);
   }
 
+  useRealtime([{ table: "mooc_requests" }, { table: "students" }], () => router.refresh());
+  React.useEffect(() => {
+    const timer = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 20000);
+    return () => clearInterval(timer);
+  }, [router]);
   const opted = choice === "mooc";
+  const pending = choice === "mooc_pending";
+  const needsCgpa = pending && request?.cgpa == null;
 
   return (
     <>
@@ -44,13 +52,16 @@ export function MoocClient({ choice }: { choice: StudentChoice }) {
           <CardContent className="flex items-center gap-3 p-5">
             <CheckCircle2 className="h-6 w-6 shrink-0 text-success" aria-hidden />
             <div>
-              <p className="font-semibold">You have opted for MOOC</p>
-              <p className="text-sm text-muted-foreground">Your choice is recorded. The Minor Project dashboard is unavailable. Contact the admin if this needs to change.</p>
+              <p className="font-semibold">Your MOOC request is approved</p>
+              <p className="text-sm text-muted-foreground">Your Faculty Advisor has approved your request. You can proceed with MOOC course selection. The Minor Project dashboard is unavailable.</p>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {pending && <Card className="mb-6 border-warning/40 bg-warning/10"><CardContent className="flex items-start gap-3 p-5"><Clock className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden /><div><p className="font-semibold">Awaiting Faculty Advisor approval</p><p className="text-sm text-muted-foreground">Your CGPA: {request?.cgpa == null ? "Not provided" : Number(request.cgpa).toFixed(2)}. MOOC access is granted only after your advisor approves your request. Minor is unavailable while this request is pending.</p>{needsCgpa && <p className="mt-2 text-sm">Supply your CGPA below so your advisor can review your request.</p>}</div></CardContent></Card>}
+      {!pending && choice === null && request?.status === "declined" && <p className="mb-6 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">Your Faculty Advisor declined your previous MOOC request. You may submit a new request with your current CGPA or choose Minor.</p>}
+      {choice === null && request?.status === "cancelled" && <p className="mb-6 rounded-lg border bg-muted p-4 text-sm">Your previous MOOC request was cancelled when your choice was reset. You can submit a new request or choose Minor.</p>}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">{MOOC_TITLE}</CardTitle>
@@ -80,7 +91,7 @@ export function MoocClient({ choice }: { choice: StudentChoice }) {
             </p>
           )}
 
-          {choice === null && (
+          {(choice === null || needsCgpa) && (
             <div className="mt-6 space-y-4 border-t pt-5">
               <label className="flex cursor-pointer items-start gap-3 text-sm">
                 <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-[var(--primary)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
@@ -97,21 +108,21 @@ export function MoocClient({ choice }: { choice: StudentChoice }) {
       <ConfirmDialog
         open={confirm}
         onOpenChange={setConfirm}
-        title="Confirm MOOC selection"
-        description="You will not be able to apply for a Minor project after this. Do you want to continue?"
-        confirmLabel="Yes, opt for MOOC"
+        title="Request MOOC approval"
+        description="Your Faculty Advisor will review your CGPA. Minor will be unavailable while the request is pending or approved. MOOC access starts only after approval."
+        confirmLabel="Send to Faculty Advisor"
         onConfirm={optIn}
         confirmDisabled={!eligible || !agree || frozen}
       >
         <Field label="Your CGPA" htmlFor="mooc-cgpa">
-          <Input id="mooc-cgpa" type="number" min="9.01" max="10" step="0.01" value={cgpa} onChange={(e) => setCgpa(e.target.value)} />
-          <p className="mt-2 text-sm text-muted-foreground">Enter your current CGPA. It must be greater than 9 and no higher than 10.</p>
+          <Input id="mooc-cgpa" type="number" min="9.00" max="10" step="0.01" value={cgpa} onChange={(e) => setCgpa(e.target.value)} />
+          <p className="mt-2 text-sm text-muted-foreground">Enter your current CGPA. It must be 9.00 or above and no higher than 10.00.</p>
         </Field>
       </ConfirmDialog>
       <MessageDialog
         open={success}
         onOpenChange={setSuccess}
-        title="MOOC selected"
+        title="MOOC request sent"
         message={MSG.MOOC_SUCCESS}
         onClose={() => router.refresh()}
       />

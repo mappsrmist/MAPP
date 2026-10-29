@@ -9,16 +9,18 @@ import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme";
 import { cn } from "@/lib/utils";
+import { PortalGuidelines, type LoginRole } from "./portal-guidelines";
 
-type Tab = "student" | "faculty";
+type Tab = LoginRole;
 const TABS: { role: Tab; label: string; icon: React.ReactNode; userLabel: string; placeholder: string }[] = [
-  { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration number", placeholder: "RA2411003010058" },
-  { role: "faculty", label: "Faculty", icon: <Users className="h-4 w-4" />, userLabel: "SRM mail ID", placeholder: "name@srmist.edu.in" },
+  { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration Number", placeholder: "RA2411003010058" },
+  { role: "faculty", label: "Faculty", icon: <Users className="h-4 w-4" />, userLabel: "SRM Email ID", placeholder: "name@srmist.edu.in" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
   const [role, setRole] = React.useState<Tab>("student");
+  const [guidelinesRole, setGuidelinesRole] = React.useState<LoginRole>("student");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -52,33 +54,41 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center p-4">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-      <div className="w-full max-w-md">
-        <div className="mb-7 flex items-center gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-            <GraduationCap className="h-7 w-7" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">MAPP</h1>
-            <p className="max-w-64 text-sm text-muted-foreground">Minor and Major Project Allocation Portal</p>
+    <main className="min-h-screen">
+      <header className="border-b bg-card">
+        <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-5 sm:gap-6 sm:px-8 sm:py-7">
+          {/* Replace these labelled slots with official logo images when assets are supplied. */}
+          <div aria-label="Official SRM logo placeholder" className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-dashed border-input px-1 text-center sm:h-20 sm:w-24">
+            <span className="text-xs font-medium sm:text-sm">SRM logo</span><span className="mt-1 text-[10px] text-muted-foreground">Placeholder</span>
+          </div>
+          <div className="text-center">
+            <h1 className="text-xs font-semibold leading-relaxed tracking-wide sm:text-lg lg:text-xl">DEPARTMENT OF COMPUTING TECHNOLOGIES</h1>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">Minor and Major Project Allocation Portal (MAPP)</p>
+            <p className="mt-1 hidden text-xs text-muted-foreground sm:block">SRM Institute of Science and Technology</p>
+          </div>
+          <div className="flex flex-col-reverse items-center gap-2 sm:flex-row sm:gap-4">
+            <ThemeToggle />
+            <div aria-label="Official C.Tech logo placeholder" className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-dashed border-input px-1 text-center sm:h-20 sm:w-24">
+              <span className="text-xs font-medium sm:text-sm">C.Tech logo</span><span className="mt-1 text-[10px] text-muted-foreground">Placeholder</span>
+            </div>
           </div>
         </div>
-
-        <Card className="p-6 sm:p-8">
-          <h2 className="text-xl font-semibold tracking-tight">Sign in to your portal</h2>
-          <p className="mt-1 mb-6 text-sm text-muted-foreground">Choose your role and enter your college credentials.</p>
-          <div role="tablist" aria-label="Sign in as" className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+      </header>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10 lg:py-12">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-8">
+        <Card className="p-6 sm:p-8 lg:sticky lg:top-8">
+          <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground"><GraduationCap className="h-6 w-6" aria-hidden /></span>
+          <h2 id="login-heading" className="text-2xl font-semibold tracking-tight">Welcome to MAPP</h2>
+          <p className="mt-2 mb-7 text-sm text-muted-foreground">Sign in to access your project allocation portal.</p>
+          <div role="group" aria-label="Sign in as" className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
             {TABS.map((t) => (
               <button
                 key={t.role}
-                role="tab"
                 type="button"
-                aria-selected={role === t.role}
+                aria-pressed={role === t.role}
                 onClick={() => {
                   setRole(t.role);
+                  setGuidelinesRole(t.role);
                   setError(null);
                   setUsername("");
                   setPassword("");
@@ -95,7 +105,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-4" role="tabpanel">
+          <form onSubmit={onSubmit} className="space-y-4" aria-labelledby="login-heading">
             <div>
               <Label htmlFor="username">{tab.userLabel}</Label>
               <div className="relative">
@@ -135,6 +145,9 @@ export default function LoginPage() {
             </Button>
           </form>
         </Card>
+          <PortalGuidelines role={guidelinesRole} onRoleChange={setGuidelinesRole} />
+        </div>
+        <footer className="mt-8 border-t pt-5 text-center text-xs text-muted-foreground">Department of Computing Technologies · SRMIST</footer>
       </div>
     </main>
   );

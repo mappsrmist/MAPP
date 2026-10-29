@@ -26,13 +26,23 @@ async function handlePost(request: Request) {
   if (!body.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { action, ids } = body.data;
 
+  // The RPC ignores IDs outside students, whereas Auth's admin API accepts any account.
+  // Verify the entire selection before either write so a mixed request cannot ban/unban faculty or admins.
+  const admin = createAdminClient();
+  const selectedIds = [...new Set(ids)];
+  const { data: students, error: lookupError } = await admin.from("students").select("id").in("id", selectedIds);
+  if (lookupError || !students) return NextResponse.json({ error: "Could not verify the selected students. Please try again." }, { status: 503 });
+  const studentIds = new Set(students.map((student) => student.id as string));
+  if (selectedIds.some((id) => !studentIds.has(id))) {
+    return NextResponse.json({ error: "Only student accounts can be removed or restored here." }, { status: 400 });
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(action === "remove" ? "admin_remove_students" : "admin_restore_students", { p_ids: ids });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-  const admin = createAdminClient();
   const results = await Promise.all(
-    ids.map((id) => admin.auth.admin.updateUserById(id, { ban_duration: action === "remove" ? BAN : "none" })),
+    selectedIds.map((id) => admin.auth.admin.updateUserById(id, { ban_duration: action === "remove" ? BAN : "none" })),
   );
   const loginFailures = results.filter((r) => r.error).length;
   return NextResponse.json({ count: data as number, loginFailures });

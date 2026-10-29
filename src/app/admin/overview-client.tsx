@@ -11,8 +11,9 @@ import type { AdminStats, SectionRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StudentList } from "./student-list";
 
-type TabKey = "mooc" | "not_opted";
+type TabKey = "mooc_pending" | "mooc" | "not_opted";
 const TABS: { key: TabKey; label: string }[] = [
+  { key: "mooc_pending", label: "MOOC pending" },
   { key: "mooc", label: "MOOC Opted" },
   { key: "not_opted", label: "Not Opted" },
 ];
@@ -46,6 +47,7 @@ export function OverviewClient() {
         { label: "Total Faculty", value: stats.faculty },
         { label: "Minor", value: stats.minor },
         { label: "MOOC Opted", value: stats.mooc },
+        { label: "MOOC pending", value: stats.mooc_pending },
         { label: "Not Opted", value: stats.not_opted },
       ]
     : null;
@@ -54,7 +56,7 @@ export function OverviewClient() {
     <>
       <PageHeader title="Overview" description="Where every student stands. Allocations, freeze controls and imports have their own pages." />
 
-      <section aria-label="Statistics" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <section aria-label="Statistics" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {cards
           ? cards.map((c) => (
               <Card key={c.label} className="p-4">
@@ -62,7 +64,7 @@ export function OverviewClient() {
                 <p className="mt-1 text-2xl font-semibold tabular-nums">{c.value}</p>
               </Card>
             ))
-          : Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-20" />)}
+          : Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-20" />)}
       </section>
       {stats && <p className="-mt-3 mb-6 text-xs text-muted-foreground">Exempt from MOOC and Minor: {stats.exempt}</p>}
 

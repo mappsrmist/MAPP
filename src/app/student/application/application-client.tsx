@@ -18,6 +18,7 @@ import type { ApplicationForm } from "@/lib/types";
 
 interface Values {
   title: string;
+  project_type: "" | "research" | "product" | "multidisciplinary";
   sdg: string;
   problem: "" | "yes" | "no";
   s1_mail: string;
@@ -29,10 +30,11 @@ interface Values {
   s2_mobile: string;
 }
 
-const EMPTY: Values = { title: "", sdg: "", problem: "", s1_mail: "", s1_mobile: "", s2_name: "", s2_reg: "", s2_section: "", s2_mail: "", s2_mobile: "" };
+const EMPTY: Values = { title: "", project_type: "", sdg: "", problem: "", s1_mail: "", s1_mobile: "", s2_name: "", s2_reg: "", s2_section: "", s2_mail: "", s2_mobile: "" };
 
 const toValues = (f: ApplicationForm): Values => ({
   title: f.project_title ?? "",
+  project_type: f.project_type ?? "",
   sdg: f.sdg_goal ?? "",
   problem: f.problem_by_guide === null ? "" : f.problem_by_guide ? "yes" : "no",
   s1_mail: f.s1_mail ?? "",
@@ -48,6 +50,7 @@ const toValues = (f: ApplicationForm): Values => ({
 const merge = (f: ApplicationForm, v: Values): ApplicationForm => ({
   ...f,
   project_title: v.title,
+  project_type: v.project_type || null,
   sdg_goal: v.sdg,
   problem_by_guide: v.problem === "" ? null : v.problem === "yes",
   s1_mail: v.s1_mail,
@@ -126,6 +129,7 @@ export function ApplicationClient() {
     const v = getValues();
     const { error } = await supabase.rpc("save_application", {
       p_title: v.title,
+      p_project_type: v.project_type || null,
       p_sdg: v.sdg,
       p_problem: v.problem === "" ? null : v.problem === "yes",
       p_s1_mail: v.s1_mail,
@@ -196,6 +200,14 @@ export function ApplicationClient() {
                 <Input id="title" maxLength={200} disabled={dis} {...register("title")} />
               </Field>
             </div>
+            <Field label="Project Type" htmlFor="project_type" error={errors.project_type?.message}>
+              <Select id="project_type" disabled={dis} {...register("project_type")}>
+                <option value="">Select…</option>
+                <option value="research">Research</option>
+                <option value="product">Product</option>
+                <option value="multidisciplinary">Multidisciplinary</option>
+              </Select>
+            </Field>
             <Field label="SDG Goal" htmlFor="sdg" error={errors.sdg?.message}>
               <Input id="sdg" list="sdg-goals" placeholder="1. No Poverty" maxLength={100} disabled={dis} {...register("sdg")} />
               <datalist id="sdg-goals">
@@ -274,8 +286,8 @@ export function ApplicationClient() {
             <Field label="Guide Emp ID" htmlFor="g_emp">
               <Input id="g_emp" readOnly value={form.guide_emp_id} className={ro} />
             </Field>
-            <Field label="Department" htmlFor="g_department">
-              <Input id="g_department" readOnly value={form.guide_department} className={ro} />
+            <Field label="Department / Designation" htmlFor="g_department">
+              <Input id="g_department" readOnly value={[form.guide_department, form.guide_designation].filter(Boolean).join(" / ")} className={ro} />
             </Field>
             <Field label="Contact Number" htmlFor="g_phone">
               <Input id="g_phone" readOnly value={form.guide_phone ?? ""} className={ro} />

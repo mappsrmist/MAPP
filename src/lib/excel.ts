@@ -98,7 +98,7 @@ export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
       cell.border = border;
     });
 
-    sheet.rows.forEach((r) => {
+    sheet.rows.forEach((r, index) => {
       const row = ws.addRow([
         ...(lead ? [safeCell(r.guideEmpId)] : []),
         r.first ? r.batchLabel : "",
@@ -109,7 +109,7 @@ export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
         safeCell(r.phone),
         safeCell(r.mail),
         safeCell(r.studentMobile),
-        r.first ? safeCell(r.projectTitle) : "",
+        safeCell(r.projectTitle),
         safeCell(r.guideName),
       ]);
       row.eachCell({ includeEmpty: true }, (cell, col) => {
@@ -120,9 +120,11 @@ export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
       if (r.first) {
         row.getCell(batchCol).font = { bold: true };
       } else {
-        // merge the Batch No. and Project Title cells over this batch's two rows
+        // Only a shared title spans both students; distinct applications keep their own titles.
         ws.mergeCells(row.number - 1, batchCol, row.number, batchCol);
-        ws.mergeCells(row.number - 1, titleCol, row.number, titleCol);
+        if (sheet.rows[index - 1]?.projectTitle === r.projectTitle) {
+          ws.mergeCells(row.number - 1, titleCol, row.number, titleCol);
+        }
       }
     });
     ws.views = [{ state: "frozen", ySplit: 2 }];

@@ -1,15 +1,16 @@
 import type { Cadre } from "./config";
 
 export type RequestStatus = "pending" | "accepted" | "declined";
-export type StudentChoice = "mooc" | "minor" | "exempt" | null;
+export type StudentChoice = "mooc" | "mooc_pending" | "minor" | "exempt" | null;
 /** Status shown in the Faculty Advisor / Section views (Exempt > MOOC > Minor > Not opted). */
-export type ClassStatus = "minor" | "mooc" | "not_opted" | "exempt";
+export type ClassStatus = "minor" | "mooc" | "mooc_pending" | "not_opted" | "exempt";
 
 export interface ClassCounts {
   section: string;
   total: number;
   minor: number;
   mooc: number;
+  mooc_pending: number;
   not_opted: number;
   exempt: number;
   fa_name: string | null;
@@ -45,6 +46,7 @@ export interface AdminStats {
   faculty: number;
   minor: number;
   mooc: number;
+  mooc_pending: number;
   not_opted: number;
   exempt: number;
 }
@@ -178,6 +180,7 @@ export interface ApplicationForm {
   status: "draft" | "submitted";
   faculty_id: string;
   project_title: string | null;
+  project_type: "research" | "product" | "multidisciplinary" | null;
   sdg_goal: string | null;
   problem_by_guide: boolean | null;
   s1_name: string;
@@ -196,6 +199,7 @@ export interface ApplicationForm {
   guide_emp_id: string;
   guide_phone: string | null;
   guide_department: string;
+  guide_designation: string | null;
   can_edit: boolean;
 }
 
@@ -206,4 +210,23 @@ export interface AuditEntry {
   scope: string;
   details: Record<string, unknown>;
   created_at: string;
+}
+
+export interface MoocRequest {
+  id: string;
+  cgpa: number | null;
+  status: "pending" | "approved" | "declined" | "cancelled";
+  requested_at: string;
+}
+export interface AdvisorMoocRequest {
+  request_id: string;
+  student_id: string;
+  reg_no: string;
+  name: string;
+  section: string;
+  email: string | null;
+  cgpa: number | null;
+  status: "pending" | "approved" | "declined" | "cancelled";
+  requested_at: string;
+  total_count: number;
 }

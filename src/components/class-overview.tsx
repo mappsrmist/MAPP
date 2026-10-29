@@ -13,17 +13,19 @@ import { cn } from "@/lib/utils";
 
 export const CLASS_STATUS_LABEL: Record<ClassStatus, string> = {
   minor: "Minor",
-  mooc: "MOOC",
+  mooc: "MOOC approved",
+  mooc_pending: "MOOC pending",
   not_opted: "Not opted",
   exempt: "Exempt",
 };
-const STATUS_TONE = { minor: "info", mooc: "success", not_opted: "warning", exempt: "neutral" } as const;
+const STATUS_TONE = { minor: "info", mooc: "success", mooc_pending: "warning", not_opted: "warning", exempt: "neutral" } as const;
 const REQUEST_LABEL = { pending: "Pending", accepted: "Accepted", declined: "Declined", grouped: "Grouped" } as const;
 
 const CHIPS: { key: ClassStatus | null; label: string; count: "total" | ClassStatus }[] = [
   { key: null, label: "Total", count: "total" },
   { key: "minor", label: "Minor", count: "minor" },
-  { key: "mooc", label: "MOOC", count: "mooc" },
+  { key: "mooc", label: "MOOC approved", count: "mooc" },
+  { key: "mooc_pending", label: "MOOC pending", count: "mooc_pending" },
   { key: "not_opted", label: "Not opted", count: "not_opted" },
   { key: "exempt", label: "Exempt", count: "exempt" },
 ];
@@ -32,7 +34,7 @@ const CHIPS: { key: ClassStatus | null; label: string; count: "total" | ClassSta
  * Read-only class list for one section. Used by the Faculty Advisor page and, identically, by the admin Section
  * view. The RPCs verify that the caller is the section's advisor (or the admin), so this component trusts nothing.
  */
-export function ClassOverview({ section }: { section: string }) {
+export function ClassOverview({ section, refreshKey = 0 }: { section: string; refreshKey?: number }) {
   const supabase = React.useMemo(() => createClient(), []);
   const [loaded, setLoaded] = React.useState<{ section: string; counts: ClassCounts } | null>(null);
   const [status, setStatus] = React.useState<ClassStatus | null>(null);
@@ -48,7 +50,7 @@ export function ClassOverview({ section }: { section: string }) {
     return () => {
       live = false;
     };
-  }, [supabase, section]);
+  }, [supabase, section, refreshKey]);
 
   async function download() {
     const { data, error } = await supabase.rpc("fa_class_overview", { p_section: section, p_search: null, p_status: status, p_page: 0 });
@@ -114,6 +116,7 @@ export function ClassOverview({ section }: { section: string }) {
         key={section}
         rowKey={(r) => r.student_id}
         deps={[status]}
+        refreshKey={refreshKey}
         searchPlaceholder="Search by registration number or name"
         emptyTitle="No students match"
         onError={(m) => toast.error(m)}

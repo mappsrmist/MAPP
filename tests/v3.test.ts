@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 vi.mock("server-only", () => ({}));
@@ -10,13 +10,8 @@ import { BATCH_COLUMNS, GUIDE_EMP_COLUMN, buildSheetRows, guideTitle, sheetsFrom
 import { buildBatchWorkbook } from "@/lib/excel";
 import { IMPORT_HEADERS } from "@/lib/import-excel";
 import { advisorRowSchema, facultyRowSchema, importRequestSchema, loginSchema, studentActionSchema } from "@/lib/validators";
-import type { BatchRow, RequestDetail } from "@/lib/types";
+import type { RequestDetail } from "@/lib/types";
 
-const walk = (dir: string): string[] =>
-  readdirSync(dir).flatMap((f) => {
-    const p = join(dir, f);
-    return statSync(p).isDirectory() ? walk(p) : [p];
-  });
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
 describe("admin sign-in goes through the Faculty tab", () => {
@@ -54,13 +49,13 @@ describe("admin sign-in goes through the Faculty tab", () => {
 });
 
 describe("imports", () => {
-  it("faculty template has no designation and no DOB; cadre stays", () => {
-    expect(IMPORT_HEADERS.faculty).toEqual(["emp_id", "name", "srm_email", "phone", "venue", "domains", "cadre"]);
+  it("faculty template supports optional designation and retains cadre", () => {
+    expect(IMPORT_HEADERS.faculty).toEqual(["emp_id", "name", "srm_email", "phone", "venue", "domains", "cadre", "designation"]);
     expect(IMPORT_HEADERS.advisors).toEqual(["emp_id", "section"]);
     const row = { emp_id: "600323", name: "X", srm_email: "x@srmist.edu.in", cadre: "OTHER" };
     expect(facultyRowSchema.safeParse(row).success).toBe(true);
-    expect(facultyRowSchema.safeParse({ ...row, designation: "Prof" }).success).toBe(false);
-    expect(importRequestSchema.safeParse({ type: "faculty", rows: [{ ...row, designation: "P" }] }).success).toBe(false);
+    expect(facultyRowSchema.safeParse({ ...row, designation: "Prof" }).success).toBe(true);
+    expect(importRequestSchema.safeParse({ type: "faculty", rows: [{ ...row, designation: "P" }] }).success).toBe(true);
   });
   it("validates advisor rows and normalises the section", () => {
     expect(advisorRowSchema.parse({ emp_id: " 600323 ", section: " a2 " })).toEqual({ emp_id: "600323", section: "A2" });
@@ -134,14 +129,14 @@ describe("batch sheet: Project Title and Student Mobile No.", () => {
 });
 
 describe("overview and no-designation checks", () => {
-  it("never mentions designation in app code, SQL results, templates or exports", () => {
-    const hits = walk(join(process.cwd(), "src")).filter((f) => /designation/i.test(readFileSync(f, "utf8")));
-    expect(hits).toEqual([]);
+  it("shows department and designation on the application and PDF", () => {
+    expect(read("src/app/student/application/application-client.tsx")).toContain("Department / Designation");
+    expect(read("src/lib/application-pdf.ts")).toContain("Department / Designation");
   });
-  it("overview has the five cards, the two tabs, a section view, and no filter or department", () => {
+  it("overview includes pending MOOC separately from approved and unselected students", () => {
     const o = read("src/app/admin/overview-client.tsx");
-    for (const label of ["Total Students", "Total Faculty", "Minor", "MOOC Opted", "Not Opted"]) expect(o).toContain(label);
-    expect(o).not.toMatch(/Filter|filter|Dept|Department|total_seats|pending|accepted|declined/);
+    for (const label of ["Total Students", "Total Faculty", "Minor", "MOOC Opted", "MOOC pending", "Not Opted"]) expect(o).toContain(label);
+    expect(o).not.toMatch(/Filter|filter|Dept|Department|total_seats|accepted|declined/);
     const list = read("src/app/admin/student-list.tsx");
     expect(list).toContain("Faculty Advisor Name");
     expect(list).toContain("Student SRM Mail");

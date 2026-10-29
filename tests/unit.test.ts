@@ -90,13 +90,17 @@ describe("faculty approached table", () => {
 
 describe("application form validation", () => {
   const ok = {
-    title: "Smart Campus", sdg: "1. No Poverty", problem: "yes", s1_mail: "a@srmist.edu.in", s1_mobile: "98765 43210",
+    title: "Smart Campus", project_type: "research", sdg: "1. No Poverty", problem: "yes", s1_mail: "a@srmist.edu.in", s1_mobile: "98765 43210",
     s2_name: "B", s2_reg: "ra2411003010059", s2_section: "A", s2_mail: "b@srmist.edu.in", s2_mobile: "9123456780",
   };
   it("accepts a complete form and normalises numbers / reg no", () => {
     const r = applicationSubmitSchema.parse(ok);
     expect(r.s1_mobile).toBe("9876543210");
     expect(r.s2_reg).toBe("RA2411003010059");
+  });
+  it("requires one supported project type before submission", () => {
+    for (const project_type of ["research", "product", "multidisciplinary"]) expect(applicationSubmitSchema.safeParse({ ...ok, project_type }).success).toBe(true);
+    for (const project_type of ["", "other", undefined]) expect(applicationSubmitSchema.safeParse({ ...ok, project_type }).success).toBe(false);
   });
   it("requires an SDG that starts with a number from 1 to 17", () => {
     for (const good of ["1. No Poverty", "17. Partnerships for the Goals", "9 Industry", "13) Climate Action"]) expect(SDG_PATTERN.test(good)).toBe(true);
@@ -194,7 +198,7 @@ describe("excel safety + batch sheet", () => {
 
 describe("application PDF", () => {
   const form: ApplicationForm = {
-    application_id: "a", status: "submitted", faculty_id: "f", project_title: "Smart Campus ".repeat(12), sdg_goal: "1. No Poverty",
+    project_type: "research", guide_designation: "Assistant Professor", application_id: "a", status: "submitted", faculty_id: "f", project_title: "Smart Campus ".repeat(12), sdg_goal: "1. No Poverty",
     problem_by_guide: true, s1_name: "அரவிந்த் Kumar", s1_reg: "RA2411003010058", s1_section: "A", s1_mail: "a@srmist.edu.in", s1_mobile: "9876543210",
     s2_name: "B", s2_reg: "RA2411003010059", s2_section: "A", s2_mail: "b@srmist.edu.in", s2_mobile: "9123456780", s2_locked: true,
     guide_name: "Deeban", guide_emp_id: "600323", guide_phone: "9999999999", guide_department: "Computing Technologies", can_edit: false,

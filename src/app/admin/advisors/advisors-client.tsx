@@ -50,20 +50,23 @@ export function AdvisorsClient() {
     const { data, error } = await supabase.rpc("admin_set_fa", { p_emp_id: emp, p_section: sec, p_replace: doReplace });
     if (error) {
       const already = /already assigned to (.+)\.$/.exec(error.message);
-      if (already && !doReplace) return void setReplace({ empId: emp, section: sec, current: already[1] });
-      return void toast.error(error.message);
+      if (already && !doReplace) setReplace({ empId: emp, section: sec, current: already[1] });
+      else toast.error(error.message);
+      return false;
     }
     toast.success(data === "unchanged" ? "Already assigned" : data === "replaced" ? "Faculty Advisor replaced" : "Faculty Advisor added");
     setRefresh((n) => n + 1);
+    return true;
   }
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await assign(empId, section, false);
-      setEmpId("");
-      setSection("");
+      if (await assign(empId, section, false)) {
+        setEmpId("");
+        setSection("");
+      }
     } finally {
       setBusy(false);
     }
@@ -191,25 +194,20 @@ export function AdvisorsClient() {
           setRefresh((n) => n + 1);
         }}
       />
-      <EditDialog
+      {edit && <EditDialog
         row={edit}
         onClose={() => setEdit(null)}
         onSave={async (emp) => {
-          await assign(emp, edit!.section, true);
+          return assign(emp, edit.section, true);
         }}
-      />
+      />}
     </>
   );
 }
 
-function EditDialog({ row, onClose, onSave }: { row: AdvisorRow | null; onClose: () => void; onSave: (empId: string) => Promise<void> }) {
-  const [value, setValue] = React.useState("");
+function EditDialog({ row, onClose, onSave }: { row: AdvisorRow; onClose: () => void; onSave: (empId: string) => Promise<boolean> }) {
+  const [value, setValue] = React.useState(row.fa_emp_id);
   const [busy, setBusy] = React.useState(false);
-  const [lastKey, setLastKey] = React.useState<string | null>(null);
-  if (row && row.section !== lastKey) {
-    setLastKey(row.section);
-    setValue(row.fa_emp_id);
-  }
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && !busy && onClose()}>
       <DialogContent title={`Edit section ${row?.section ?? ""}`} description="Assign a different Faculty Advisor by employee ID." className="max-w-sm">
@@ -226,10 +224,9 @@ function EditDialog({ row, onClose, onSave }: { row: AdvisorRow | null; onClose:
             onClick={async () => {
               setBusy(true);
               try {
-                await onSave(value);
+                if (await onSave(value)) onClose();
               } finally {
                 setBusy(false);
-                onClose();
               }
             }}
           >

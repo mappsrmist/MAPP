@@ -43,18 +43,11 @@ export function BatchFormDialog({
   const supabase = React.useMemo(() => createClient(), []);
   const members = existing ? [...existing.batch_members].sort((a, b) => a.slot - b.slot) : [];
   const byId = new Map(options.map((o) => [o.student_id, o]));
-  // the last advisor name and mail we filled in per slot, so a manual override is never overwritten
-  const autoAdvisor = React.useRef<Record<Slot, string>>({ m1: "", m2: "" });
-  const autoMail = React.useRef<Record<Slot, string>>({ m1: "", m2: "" });
-
   const blank = (i: number) => {
     const sid = members[i]?.student_id ?? "";
     const st = sid ? byId.get(sid) : undefined;
     const advisor = members[i]?.advisor_name || st?.fa_name || "";
     const mail = members[i]?.srm_mail || st?.student_email || "";
-    const slotKey: Slot = i === 0 ? "m1" : "m2";
-    autoAdvisor.current[slotKey] = advisor;
-    autoMail.current[slotKey] = mail;
     return {
       student: sid,
       section: members[i]?.section || st?.student_section || "",
@@ -63,6 +56,11 @@ export function BatchFormDialog({
       mail,
     };
   };
+  const defaults = { m1: blank(0), m2: blank(1) };
+  // Preserve manual overrides while tracking only values filled by this editor.
+  const autoSection = React.useRef<Record<Slot, string>>({ m1: defaults.m1.section, m2: defaults.m2.section });
+  const autoAdvisor = React.useRef<Record<Slot, string>>({ m1: defaults.m1.advisor, m2: defaults.m2.advisor });
+  const autoMail = React.useRef<Record<Slot, string>>({ m1: defaults.m1.mail, m2: defaults.m2.mail });
 
   const {
     control,
@@ -73,7 +71,7 @@ export function BatchFormDialog({
     formState: { errors, isSubmitting },
   } = useForm<In, unknown, Out>({
     resolver: zodResolver(batchFormSchema),
-    defaultValues: { m1: blank(0), m2: blank(1) },
+    defaultValues: defaults,
   });
 
   const s1 = useWatch({ control, name: "m1.student" }) ?? "";
@@ -110,8 +108,11 @@ export function BatchFormDialog({
               void pick.onChange(ev);
               const sid = ev.target.value;
               const st = byId.get(sid);
-              if (st?.student_section && !getValues(`${slot}.section`)) {
-                setValue(`${slot}.section`, st.student_section);
+              const currentSection = getValues(`${slot}.section`);
+              if (!currentSection || currentSection === autoSection.current[slot]) {
+                const nextSection = st?.student_section ?? "";
+                autoSection.current[slot] = nextSection;
+                setValue(`${slot}.section`, nextSection);
               }
               const currentAdvisor = getValues(`${slot}.advisor`);
               if (!currentAdvisor || currentAdvisor === autoAdvisor.current[slot]) {

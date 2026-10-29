@@ -11,9 +11,10 @@ import { exportTable } from "@/lib/excel";
 import { createClient } from "@/lib/supabase/client";
 import type { AdminStudentRow } from "@/lib/types";
 
-export type StudentListKind = "mooc" | "not_opted" | "exempt" | "removed";
+export type StudentListKind = "mooc_pending" | "mooc" | "not_opted" | "exempt" | "removed";
 
 const COPY: Record<StudentListKind, { empty: string; file: string }> = {
+  mooc_pending: { empty: "No MOOC requests awaiting approval", file: "MAPP_MOOC_Pending.xlsx" },
   mooc: { empty: "No MOOC selections yet", file: "MAPP_MOOC_Students.xlsx" },
   not_opted: { empty: "Everyone has made a choice", file: "MAPP_Students_Not_Opted.xlsx" },
   exempt: { empty: "No exempt students", file: "MAPP_Exempt_Students.xlsx" },

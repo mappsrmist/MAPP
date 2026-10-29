@@ -31,7 +31,7 @@ export const MOOC_TITLE = "Rules and Regulations for MOOC Course Selection – 2
 
 export const MOOC_RULES: { title: string; text: string }[] = [
   { title: "Approved Course Selection", text: "Students must select a MOOC course strictly from the official approved list provided by the MOOC coordinators." },
-  { title: "SWAYAM Course List", text: "The list of MOOC courses for January–May 2026 is yet to be released on the SWAYAM portal. Once available, students who have opted for MOOC can choose any one course from the official list provided by the MOOC coordinators." },
+  { title: "SWAYAM Course List", text: "Students approved for MOOC must choose one course from the official list for the current semester provided by the MOOC coordinators." },
   { title: "Course Relevance", text: "Students should choose a course that complements their existing knowledge and enhances their skills." },
   { title: "Course Duration", text: "Each course must be completed within the prescribed duration of 12 weeks." },
   { title: "Credits", text: "The MOOC course carries a weightage of 3 academic credits." },
@@ -43,7 +43,7 @@ export const MOOC_RULES: { title: string; text: string }[] = [
   { title: "Failure to Complete the Course", text: "Students who fail the course must complete it in the subsequent semester to earn the required credits." },
   { title: "Faculty Guidance", text: "Students should consult the faculty coordinator or academic advisor if they have any doubts regarding course selection or suitability." },
   { title: "Mandatory Compliance", text: "Students must follow all the prescribed guidelines. Non-compliance may require them to retake the course to earn the required credits." },
-  { title: "CGPA Eligibility", text: "Students must have a CGPA greater than 9 to opt for the MOOC course." },
+  { title: "CGPA Eligibility", text: "Students must have a CGPA of 9.00 or above (up to 10.00) to apply for MOOC. Faculty Advisor approval is required." },
 ];
 
 export const MOOC_IMPORTANT =
@@ -53,9 +53,9 @@ export const MOOC_IMPORTANT =
 export const MSG = {
   FORCE_PASSWORD:
     "For your security, you must change your password before proceeding. Please create a new, strong password to continue using the portal.",
-  MOOC_AGREE: "I agree to the rules and regulations and confirm that I am opting for the MOOC course.",
-  MOOC_SUCCESS: "You have successfully opted for the MOOC course.",
-  MINOR_LOCKED: "You have already opted for the MOOC course. The Minor Project dashboard is unavailable.",
+  MOOC_AGREE: "I agree to the rules and regulations and request Faculty Advisor approval for the MOOC course.",
+  MOOC_SUCCESS: "Your MOOC request has been sent to your Faculty Advisor. Access will be granted only after approval.",
+  MINOR_LOCKED: "You have a pending or approved MOOC request. The Minor Project dashboard is unavailable.",
   EXEMPT: "You are exempted from MOOC and Minor Project by the admin.",
   MEET_FACULTY: "You can call / meet the faculty in person at their venue for approval.",
   APPLICATION_LOCKED: "The Application Form opens only after your guide completes your batch.",

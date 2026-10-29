@@ -9,6 +9,6 @@ export default async function MinorPage() {
   if (student?.choice === "exempt") return <ExemptLocked />;
 
   // Enforced server-side: a MOOC student never receives the Minor dashboard (the RPCs refuse them too).
-  if (student?.choice === "mooc") return <MinorLocked />;
+  if (student?.choice === "mooc" || student?.choice === "mooc_pending") return <MinorLocked />;
   return <MinorClient userId={user.id} />;
 }

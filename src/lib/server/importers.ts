@@ -80,6 +80,7 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
       name: row.name,
       srm_email: row.srm_email,
       cadre: row.cadre,
+      ...(row.designation !== null ? { designation: row.designation } : {}),
       phone: row.phone,
       venue: row.venue,
       domains: row.domains,
