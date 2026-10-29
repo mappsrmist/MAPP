@@ -18,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       <body className="min-h-screen">
         <ThemeProvider>
+          <a href="#main-content" className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground focus:not-sr-only">Skip to main content</a>
           {children}
           <Toaster richColors closeButton position="top-right" />
         </ThemeProvider>

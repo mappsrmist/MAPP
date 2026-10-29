@@ -4,13 +4,13 @@
 
 :root {
   --background: #f5f8f7;
-  --foreground: #243b39;
+  --foreground: #203c37;
   --card: #ffffff;
-  --card-foreground: #243b39;
+  --card-foreground: #203c37;
   --muted: #edf2f3;
-  --muted-foreground: #5c706e;
-  --border: #dce6e3;
-  --input: #bdceca;
+  --muted-foreground: #526b65;
+  --border: #d6e2dd;
+  --input: #80988c;
   --primary: #35665e;
   --primary-hover: #28534c;
   --primary-foreground: #ffffff;
@@ -23,23 +23,23 @@
 }
 
 .dark {
-  --background: #0a1020;
-  --foreground: #e8ecf6;
-  --card: #111a2f;
-  --card-foreground: #e8ecf6;
-  --muted: #17223c;
-  --muted-foreground: #9aa6c0;
-  --border: #25314d;
-  --input: #2e3c5c;
-  --primary: #5b8cf5;
-  --primary-hover: #7aa2fa;
-  --primary-foreground: #08122b;
-  --accent: #1a2a4f;
-  --accent-foreground: #cfe0ff;
+  --background: #101c19;
+  --foreground: #e7f0eb;
+  --card: #182722;
+  --card-foreground: #e7f0eb;
+  --muted: #21362e;
+  --muted-foreground: #afc4b9;
+  --border: #354d42;
+  --input: #688477;
+  --primary: #95cdb6;
+  --primary-hover: #b2dfcb;
+  --primary-foreground: #10291f;
+  --accent: #264438;
+  --accent-foreground: #cde9db;
   --destructive: #f0646a;
   --success: #4ade80;
   --warning: #fbbf24;
-  --ring: #5b8cf5;
+  --ring: #95cdb6;
 }
 
 @theme inline {
@@ -86,4 +86,27 @@ body {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Official artwork stays on a neutral plate in either theme. */
+.brand-plate {
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+html { scroll-padding-top: 24px; }
+body { -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent); color: var(--foreground); }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; }
+input, select, textarea { transition: border-color 150ms ease, box-shadow 150ms ease; }
+input:focus, select:focus, textarea:focus { border-color: var(--ring); }
+input[readonly] { color: var(--muted-foreground); }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--destructive); }
+@media (pointer: coarse) {
+  button, [role="tab"], select, input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  input, select, textarea { transition: none; }
 }

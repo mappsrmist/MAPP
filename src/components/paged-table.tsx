@@ -124,9 +124,9 @@ export function PagedTable<T>({
         </div>
       )}
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div role="region" aria-label="Table results" tabIndex={0} className="overflow-x-auto focus-visible:-outline-offset-2">
           <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
+            <thead className="border-b bg-muted/65 text-left text-xs text-muted-foreground">
               <tr>
                 {columns.map((c) => (
                   <th key={c.header} scope="col" className={cn("whitespace-nowrap px-4 py-3 font-medium", c.className)}>
@@ -147,7 +147,7 @@ export function PagedTable<T>({
                     </tr>
                   ))
                 : state?.rows.map((row) => (
-                    <tr key={rowKey(row)} className="hover:bg-accent/40">
+                    <tr key={rowKey(row)} className="transition-colors hover:bg-accent/35">
                       {columns.map((c) => (
                         <td key={c.header} className={cn("px-4 py-3 align-middle", c.className)}>
                           {c.cell(row)}
@@ -161,7 +161,7 @@ export function PagedTable<T>({
         {state && state.rows.length === 0 && (
           <EmptyState title={emptyTitle} hint={emptyHint} icon={<Inbox className="h-8 w-8" aria-hidden />} />
         )}
-        <div className="flex items-center justify-between gap-2 border-t px-4 py-3 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
           <span aria-live="polite">{total > 0 ? `${from}–${to} of ${total}` : "0 results"}</span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1} aria-label="Previous page">

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/form";
+import { InstitutionHeader } from "@/components/institution-header";
 import { ThemeToggle } from "@/components/theme";
 import { cn } from "@/lib/utils";
 import { PortalGuidelines, type LoginRole } from "./portal-guidelines";
@@ -54,31 +55,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b bg-card">
-        <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-5 sm:gap-6 sm:px-8 sm:py-7">
-          {/* Replace these labelled slots with official logo images when assets are supplied. */}
-          <div aria-label="Official SRM logo placeholder" className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-dashed border-input px-1 text-center sm:h-20 sm:w-24">
-            <span className="text-xs font-medium sm:text-sm">SRM logo</span><span className="mt-1 text-[10px] text-muted-foreground">Placeholder</span>
-          </div>
-          <div className="text-center">
-            <h1 className="text-xs font-semibold leading-relaxed tracking-wide sm:text-lg lg:text-xl">DEPARTMENT OF COMPUTING TECHNOLOGIES</h1>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">Minor and Major Project Allocation Portal (MAPP)</p>
-            <p className="mt-1 hidden text-xs text-muted-foreground sm:block">SRM Institute of Science and Technology</p>
-          </div>
-          <div className="flex flex-col-reverse items-center gap-2 sm:flex-row sm:gap-4">
-            <ThemeToggle />
-            <div aria-label="Official C.Tech logo placeholder" className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-dashed border-input px-1 text-center sm:h-20 sm:w-24">
-              <span className="text-xs font-medium sm:text-sm">C.Tech logo</span><span className="mt-1 text-[10px] text-muted-foreground">Placeholder</span>
-            </div>
-          </div>
-        </div>
-      </header>
+    <main id="main-content" className="min-h-screen">
+      <InstitutionHeader actions={<ThemeToggle />} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10 lg:py-12">
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-8">
         <Card className="p-6 sm:p-8 lg:sticky lg:top-8">
           <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground"><GraduationCap className="h-6 w-6" aria-hidden /></span>
-          <h2 id="login-heading" className="text-2xl font-semibold tracking-tight">Welcome to MAPP</h2>
+          <h1 id="login-heading" className="text-2xl font-semibold tracking-tight">Welcome to MAPP</h1>
           <p className="mt-2 mb-7 text-sm text-muted-foreground">Sign in to access your project allocation portal.</p>
           <div role="group" aria-label="Sign in as" className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
             {TABS.map((t) => (
@@ -128,7 +111,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

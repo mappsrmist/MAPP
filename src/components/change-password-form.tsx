@@ -56,7 +56,7 @@ export function ChangePasswordForm({ onDone, submitLabel = "Change password" }: 
           <button
             type="button"
             onClick={() => setShowCurrent((s) => !s)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+            className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
             aria-label={showCurrent ? "Hide current password" : "Show current password"}
           >
             {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -75,7 +75,7 @@ export function ChangePasswordForm({ onDone, submitLabel = "Change password" }: 
           <button
             type="button"
             onClick={() => setShowNew((s) => !s)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+            className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
             aria-label={showNew ? "Hide new password" : "Show new password"}
           >
             {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { PagedTable } from "@/components/paged-table";
 import { batchesForCadre, MSG, PAGE_SIZE } from "@/lib/config";
-import { BATCH_COLUMNS, buildSheetRows, fillForBatch, guideTitle } from "@/lib/batch-sheet";
+import { BATCH_COLUMNS, buildSheetRows, guideTitle } from "@/lib/batch-sheet";
 import { exportBatchSheet, safeFilePart } from "@/lib/excel";
 import { createClient } from "@/lib/supabase/client";
 import type { ApplicationLite } from "@/lib/batch-sheet";
@@ -68,8 +68,8 @@ export function BatchesClient() {
           const members = b ? [...b.batch_members].sort((x, y) => x.slot - y.slot) : [];
           const grouped = members.length === 2;
           return (
-            <div key={n} className="flex flex-col rounded-xl border bg-card shadow-sm">
-              <div className="flex items-center justify-between rounded-t-xl px-4 py-2.5 text-sm font-semibold text-slate-800" style={{ background: `#${fillForBatch(n)}` }}>
+            <div key={n} className="flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+              <div className="flex items-center justify-between border-b bg-accent/55 px-4 py-3 text-sm font-semibold text-accent-foreground">
                 <span>Batch {n}</span>
                 <Badge tone={grouped ? "success" : "neutral"}>{grouped ? "Grouped" : "Empty"}</Badge>
               </div>
@@ -128,7 +128,7 @@ export function BatchesClient() {
                 <thead>
                   <tr>
                     {BATCH_COLUMNS.map((h) => (
-                      <th key={h} scope="col" className="border border-slate-400/60 px-3 py-2 text-left font-bold text-slate-800" style={{ background: "#BDD7EE" }}>
+                      <th key={h} scope="col" className="border border-border px-3 py-2 text-left font-semibold text-foreground bg-muted">
                         {h}
                       </th>
                     ))}
@@ -138,23 +138,23 @@ export function BatchesClient() {
                   {sheet.map((r, i) => (
                     <tr key={i}>
                       {r.first && (
-                        <td rowSpan={2} className="border border-slate-400/60 px-3 py-2 text-center align-middle font-bold text-slate-800" style={{ background: `#${fillForBatch(r.batchNo)}` }}>
+                        <td rowSpan={2} className="border border-border px-3 py-2 text-center align-middle font-semibold text-accent-foreground bg-accent">
                           {r.batchLabel}
                         </td>
                       )}
-                      <td className="border border-slate-400/60 px-3 py-2">{r.name}</td>
-                      <td className="border border-slate-400/60 px-3 py-2 font-mono text-xs">{r.regNo}</td>
-                      <td className="border border-slate-400/60 px-3 py-2">{r.section}</td>
-                      <td className="border border-slate-400/60 px-3 py-2">{r.advisor}</td>
-                      <td className="border border-slate-400/60 px-3 py-2">{r.phone}</td>
-                      <td className="border border-slate-400/60 px-3 py-2">{r.mail}</td>
-                      <td className="border border-slate-400/60 px-3 py-2">{r.studentMobile}</td>
+                      <td className="border border-border px-3 py-2">{r.name}</td>
+                      <td className="border border-border px-3 py-2 font-mono text-xs">{r.regNo}</td>
+                      <td className="border border-border px-3 py-2">{r.section}</td>
+                      <td className="border border-border px-3 py-2">{r.advisor}</td>
+                      <td className="border border-border px-3 py-2">{r.phone}</td>
+                      <td className="border border-border px-3 py-2">{r.mail}</td>
+                      <td className="border border-border px-3 py-2">{r.studentMobile}</td>
                       {(r.first || sheet[i - 1]?.projectTitle !== r.projectTitle) && (
-                        <td rowSpan={r.first && sheet[i + 1]?.projectTitle === r.projectTitle ? 2 : 1} className="border border-slate-400/60 px-3 py-2 align-middle">
+                        <td rowSpan={r.first && sheet[i + 1]?.projectTitle === r.projectTitle ? 2 : 1} className="border border-border px-3 py-2 align-middle">
                           {r.projectTitle}
                         </td>
                       )}
-                      <td className="border border-slate-400/60 px-3 py-2">{r.guideName}</td>
+                      <td className="border border-border px-3 py-2">{r.guideName}</td>
                     </tr>
                   ))}
                 </tbody>

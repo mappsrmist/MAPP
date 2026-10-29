@@ -29,7 +29,7 @@ export function DialogContent({
         onPointerDownOutside={dismissible ? undefined : (e) => e.preventDefault()}
         onInteractOutside={dismissible ? undefined : (e) => e.preventDefault()}
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border bg-card p-6 shadow-xl",
+          "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-6 shadow-xl",
           className,
         )}
         {...props}
@@ -42,7 +42,7 @@ export function DialogContent({
         )}
         <div className="mt-4">{children}</div>
         {dismissible && (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:bg-accent" aria-label="Close">
+          <DialogPrimitive.Close className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent" aria-label="Close">
             <X className="h-4 w-4" />
           </DialogPrimitive.Close>
         )}
