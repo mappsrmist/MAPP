@@ -64,29 +64,33 @@ export function AllocationsClient() {
 
   async function exportList() {
     const rows = await fetchAll<RequestDetail>((f, t) =>
-      supabase.from("request_details_v").select("*").order("faculty_name").order("batch_no", { nullsFirst: false }).order("slot").order("reg_no").range(f, t),
+      supabase.from("request_details_v").select("*").order("faculty_emp_id").order("batch_no", { nullsFirst: false }).order("slot").order("reg_no").range(f, t),
     );
+    // same order as the on-screen table: guide first (Emp ID, name), then the student and their batch details
     await exportTable("MAPP_Allocations_List.xlsx", "Allocations", [
-      { header: "Faculty", key: "fn", width: 28 },
-      { header: "Faculty Emp ID", key: "fe", width: 16 },
+      { header: "Guide Emp ID", key: "fe", width: 16 },
+      { header: "Guide Name", key: "fn", width: 28 },
       { header: "Batch", key: "b", width: 10 },
-      { header: "Reg No", key: "r", width: 22 },
+      { header: "Registration No.", key: "r", width: 22 },
       { header: "Student", key: "s", width: 28 },
       { header: "Section", key: "sec", width: 10 },
+      { header: "Faculty Advisor Name", key: "fa", width: 28 },
+      { header: "Project Title", key: "pt", width: 36 },
+      { header: "Student Mail ID", key: "m", width: 34 },
       { header: "Status", key: "st", width: 12 },
-    ], rows.map((r) => ({ fn: r.faculty_name, fe: r.faculty_emp_id, b: r.batch_no ? `B${r.batch_no}` : "", r: r.reg_no, s: r.student_name, sec: r.section ?? "", st: r.display_status })));
+    ], rows.map((r) => ({ fe: r.faculty_emp_id, fn: r.faculty_name, b: r.batch_no ? `B${r.batch_no}` : "", r: r.reg_no, s: r.student_name, sec: r.section ?? "", fa: r.advisor_name ?? r.fa_name ?? "", pt: r.project_title ?? "", m: r.student_email ?? r.srm_mail ?? "", st: r.display_status })));
   }
 
   /** All allocations in the faculty batch-sheet template: a combined sheet plus one sheet per faculty. */
   async function exportTemplate() {
     const rows = await fetchAll<RequestDetail>((f, t) =>
-      supabase.from("request_details_v").select("*").eq("status", "accepted").not("batch_id", "is", null).order("faculty_name").order("batch_no").order("slot").range(f, t),
+      supabase.from("request_details_v").select("*").eq("status", "accepted").not("batch_id", "is", null).order("faculty_emp_id").order("batch_no").order("slot").range(f, t),
     );
     const sheets = sheetsFromDetails(rows);
     if (sheets.length === 0) throw new Error("No grouped batches to export yet.");
     await exportBatchWorkbook("MAPP_All_Allocations.xlsx", [
-      { name: "All allocations", title: `All allocations — ${sheets.length} guide${sheets.length === 1 ? "" : "s"}`, rows: sheets.flatMap((s) => s.rows) },
-      ...sheets.map((s) => ({ name: s.guide.name, title: guideTitle(s.guide), rows: s.rows })),
+      { name: "All allocations", title: `All allocations — ${sheets.length} guide${sheets.length === 1 ? "" : "s"}`, rows: sheets.flatMap((s) => s.rows), leadEmpId: true },
+      ...sheets.map((s) => ({ name: `${s.guide.empId} ${s.guide.name}`, title: guideTitle(s.guide), rows: s.rows, leadEmpId: true })),
     ]);
   }
 
@@ -139,7 +143,7 @@ export function AllocationsClient() {
           let q = supabase
             .from("request_details_v")
             .select("*", { count: "exact" })
-            .order("faculty_name")
+            .order("faculty_emp_id")
             .order("batch_no", { nullsFirst: false })
             .order("slot", { nullsFirst: false })
             .order("reg_no")
@@ -155,19 +159,15 @@ export function AllocationsClient() {
           return { rows: (data ?? []) as RequestDetail[], total: count ?? 0 };
         }}
         columns={[
-          {
-            header: "Faculty",
-            cell: (r) => (
-              <>
-                <span className="font-medium">{r.faculty_name}</span>
-                <span className="block font-mono text-xs text-muted-foreground">{r.faculty_emp_id}</span>
-              </>
-            ),
-          },
+          { header: "Guide Emp ID", cell: (r) => <span className="font-mono text-xs">{r.faculty_emp_id}</span> },
+          { header: "Guide Name", cell: (r) => <span className="font-medium">{r.faculty_name}</span> },
           { header: "Batch", cell: (r) => (r.batch_no ? <Badge tone="info">B{r.batch_no}</Badge> : <span className="text-muted-foreground">—</span>) },
           { header: "Reg No", cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
           { header: "Student", cell: (r) => <span className="font-medium">{r.student_name}</span> },
           { header: "Section", cell: (r) => r.section ?? "—" },
+          { header: "Faculty Advisor Name", cell: (r) => r.advisor_name ?? r.fa_name ?? "—" },
+          { header: "Project Title", cell: (r) => r.project_title ?? "—" },
+          { header: "Student Mail ID", cell: (r) => r.student_email ?? r.srm_mail ?? "—" },
           { header: "Status", cell: (r) => <StatusBadge status={r.display_status} /> },
           {
             header: "Action",

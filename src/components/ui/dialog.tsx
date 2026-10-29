@@ -63,6 +63,8 @@ export function ConfirmDialog({
   description,
   confirmLabel = "Confirm",
   destructive,
+  children,
+  confirmDisabled,
   onConfirm,
 }: {
   open: boolean;
@@ -71,18 +73,22 @@ export function ConfirmDialog({
   description?: string;
   confirmLabel?: string;
   destructive?: boolean;
+  children?: React.ReactNode;
+  confirmDisabled?: boolean;
   onConfirm: () => Promise<void> | void;
 }) {
   const [busy, setBusy] = React.useState(false);
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent title={title} description={description} className="max-w-md">
+        {children}
         <DialogFooter className="mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancel
           </Button>
           <Button
             variant={destructive ? "destructive" : "default"}
+            disabled={confirmDisabled || busy}
             loading={busy}
             onClick={async () => {
               setBusy(true);

@@ -2,24 +2,23 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, GraduationCap, ShieldCheck, UserRound, Users } from "lucide-react";
+import { Eye, EyeOff, GraduationCap, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme";
-import type { Role } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
-const TABS: { role: Role; label: string; icon: React.ReactNode; userLabel: string; placeholder: string }[] = [
+type Tab = "student" | "faculty";
+const TABS: { role: Tab; label: string; icon: React.ReactNode; userLabel: string; placeholder: string }[] = [
   { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration number", placeholder: "RA2411003010058" },
   { role: "faculty", label: "Faculty", icon: <Users className="h-4 w-4" />, userLabel: "SRM mail ID", placeholder: "name@srmist.edu.in" },
-  { role: "admin", label: "Admin", icon: <ShieldCheck className="h-4 w-4" />, userLabel: "Username", placeholder: "Admin username" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
-  const [role, setRole] = React.useState<Role>("student");
+  const [role, setRole] = React.useState<Tab>("student");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -71,7 +70,7 @@ export default function LoginPage() {
         <Card className="p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight">Sign in to your portal</h2>
           <p className="mt-1 mb-6 text-sm text-muted-foreground">Choose your role and enter your college credentials.</p>
-          <div role="tablist" aria-label="Sign in as" className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+          <div role="tablist" aria-label="Sign in as" className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
             {TABS.map((t) => (
               <button
                 key={t.role}

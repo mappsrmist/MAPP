@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { bodyTooLarge, isSameOrigin, readJsonBody } from "@/lib/server/origin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/server/guards";
-import { upsertFaculty, upsertStudent, type Upserted } from "@/lib/server/importers";
-import { facultyRowSchema, importRequestSchema, studentRowSchema } from "@/lib/validators";
+import { upsertAdvisor, upsertFaculty, upsertStudent, type Upserted } from "@/lib/server/importers";
+import { advisorRowSchema, facultyRowSchema, importRequestSchema, studentRowSchema } from "@/lib/validators";
 import { enforceRateLimit } from "@/lib/server/rate-limit";
 
 export const maxDuration = 60;
@@ -31,6 +31,7 @@ async function handlePost(request: Request) {
 
   const admin = createAdminClient();
   const errors: RowError[] = [];
+  const seenSections = new Map<string, string>();
   let created = 0;
   let updated = 0;
 
@@ -46,6 +47,14 @@ async function handlePost(request: Request) {
         const r = studentRowSchema.safeParse(raw);
         if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
         record(await upsertStudent(admin, r.data));
+      } else if (type === "advisors") {
+        const r = advisorRowSchema.safeParse(raw);
+        if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
+        // a section named twice in the same file with different employees is a duplicate; the second row loses
+        const prior = seenSections.get(r.data.section);
+        if (prior && prior !== r.data.emp_id.toLowerCase()) throw new Error(`Duplicate section ${r.data.section} in this file (already mapped to ${prior}).`);
+        seenSections.set(r.data.section, r.data.emp_id.toLowerCase());
+        record(await upsertAdvisor(admin, r.data));
       } else {
         const r = facultyRowSchema.safeParse(raw);
         if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
@@ -67,6 +76,9 @@ async function handlePost(request: Request) {
     }),
   );
 
+  if (type === "advisors" && created + updated > 0) {
+    await admin.from("audit_log").insert({ actor: user.id, action: "import_advisors", scope: "advisor", details: { added: created, unchanged: updated, errors: errors.length } });
+  }
   errors.sort((a, b) => a.row - b.row);
   return NextResponse.json({ created, updated, errors });
 }

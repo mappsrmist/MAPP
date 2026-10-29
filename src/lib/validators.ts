@@ -7,7 +7,8 @@ const trimmed = (label: string, max = 200) =>
     .transform((value) => value.normalize("NFC"));
 
 export const loginSchema = z.strictObject({
-  role: z.enum(["student", "faculty", "admin"]),
+  // the admin signs in through the Faculty tab; there is no admin role on the login form
+  role: z.enum(["student", "faculty"]),
   username: z.string().trim().min(1, "Username is required").max(200),
   password: z.string().min(1, "Password is required").max(200),
 });
@@ -62,7 +63,6 @@ export const facultyRowSchema = z.strictObject({
     .pipe(z.email("srm_email is not valid"))
     .transform((v) => v.toLowerCase())
     .refine((v) => !v.endsWith("mapp.local"), "srm_email uses a reserved domain"),
-  designation: trimmed("designation", 100),
   cadre: cadreSchema,
   phone: optional,
   venue: optional,
@@ -80,11 +80,18 @@ export const facultyRowSchema = z.strictObject({
 });
 export type FacultyImportRow = z.infer<typeof facultyRowSchema>;
 
+/** Faculty Advisor mapping: one row per (employee, section); an employee may appear on several rows. */
+export const advisorRowSchema = z.strictObject({
+  emp_id: trimmed("emp_id", 40),
+  section: trimmed("section", 20).transform((v) => v.toUpperCase()),
+});
+export type AdvisorImportRow = z.infer<typeof advisorRowSchema>;
+
 export const importRequestSchema = z.strictObject({
-  type: z.enum(["students", "faculty"]),
+  type: z.enum(["students", "faculty", "advisors"]),
   offset: z.number().int().min(0).max(4999).default(0),
   rows: z.array(z.record(
-    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "designation", "cadre", "phone", "venue", "domains"].includes(key)),
+    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains"].includes(key)),
     z.string().max(500).regex(/^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/),
   )).min(1).max(100),
 }).refine((v) => v.offset + v.rows.length <= 5000, "Import at most 5,000 rows.");
@@ -150,3 +157,9 @@ export const applicationSubmitSchema = z.object({
   s2_mobile: student.mobile,
 });
 export type ApplicationSubmit = z.input<typeof applicationSubmitSchema>;
+
+// ----------------------------------------------------- admin student actions
+export const studentActionSchema = z.strictObject({
+  action: z.enum(["remove", "restore"]),
+  ids: z.array(z.uuid()).min(1).max(500),
+});

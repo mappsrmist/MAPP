@@ -19,7 +19,8 @@ type Slot = "m1" | "m2";
 
 /**
  * Group (or edit) one batch. Each of the two students has their own Section, Faculty Advisor Name, Contact Number
- * and SRM Mail ID; the advisor / contact / mail are prefilled from the faculty's profile and stay editable.
+ * and SRM Mail ID. The advisor name is filled from the section -> Faculty Advisor mapping (blank when the section has
+ * no advisor yet); contact / mail are prefilled from the faculty's profile. Everything stays editable.
  */
 export function BatchFormDialog({
   batchNo,
@@ -41,11 +42,13 @@ export function BatchFormDialog({
   const supabase = React.useMemo(() => createClient(), []);
   const members = existing ? [...existing.batch_members].sort((a, b) => a.slot - b.slot) : [];
   const byId = new Map(options.map((o) => [o.student_id, o]));
+  // the last advisor name we filled in per slot, so a manual override is never overwritten
+  const autoAdvisor = React.useRef<Record<Slot, string>>({ m1: "", m2: "" });
 
   const blank = (i: number) => ({
     student: members[i]?.student_id ?? "",
     section: members[i]?.section ?? "",
-    advisor: members[i]?.advisor_name ?? faculty.name,
+    advisor: members[i]?.advisor_name ?? "",
     contact: members[i]?.contact_number ?? faculty.phone ?? "",
     mail: members[i]?.srm_mail ?? faculty.srm_email,
   });
@@ -97,6 +100,11 @@ export function BatchFormDialog({
               // a freshly chosen student brings their own section unless one was already typed
               const st = byId.get(ev.target.value);
               if (st?.student_section && !getValues(`${slot}.section`)) setValue(`${slot}.section`, st.student_section);
+              const current = getValues(`${slot}.advisor`);
+              if (!current || current === autoAdvisor.current[slot]) {
+                autoAdvisor.current[slot] = st?.fa_name ?? "";
+                setValue(`${slot}.advisor`, st?.fa_name ?? "");
+              }
             }}
           >
             <option value="">Select a student…</option>

@@ -12,6 +12,7 @@ import { batchesForCadre, MSG, PAGE_SIZE } from "@/lib/config";
 import { BATCH_COLUMNS, buildSheetRows, fillForBatch, guideTitle } from "@/lib/batch-sheet";
 import { exportBatchSheet, safeFilePart } from "@/lib/excel";
 import { createClient } from "@/lib/supabase/client";
+import type { ApplicationLite } from "@/lib/batch-sheet";
 import type { BatchRow, RequestDetail } from "@/lib/types";
 import { useFaculty } from "../faculty-context";
 const BatchFormDialog = dynamic(() => import("./batch-form").then((mod) => mod.BatchFormDialog), {
@@ -23,16 +24,19 @@ export function BatchesClient() {
   const { faculty, tick, bump, frozen, formed } = useFaculty();
   const [accepted, setAccepted] = React.useState<RequestDetail[]>([]);
   const [batches, setBatches] = React.useState<BatchRow[]>([]);
+  const [apps, setApps] = React.useState<ApplicationLite[]>([]);
   const [version, setVersion] = React.useState(0);
   const [editing, setEditing] = React.useState<number | null>(null);
   const [ungroup, setUngroup] = React.useState<BatchRow | null>(null);
 
   const load = React.useCallback(async () => {
-    const [a, b] = await Promise.all([
+    const [a, b, c] = await Promise.all([
       supabase.from("request_details_v").select("*").eq("faculty_id", faculty.id).eq("status", "accepted").order("student_name").limit(1000),
       supabase.from("batches").select("*, batch_members(slot, student_id, section, advisor_name, contact_number, srm_mail)").eq("faculty_id", faculty.id).order("batch_no"),
+      supabase.from("applications").select("student1_id, student2_id, student1_mobile, student2_mobile, project_title").eq("faculty_id", faculty.id),
     ]);
-    if (a.error || b.error) return toast.error((a.error ?? b.error)!.message);
+    if (a.error || b.error || c.error) return toast.error((a.error ?? b.error ?? c.error)!.message);
+    setApps(c.data as ApplicationLite[]);
     setAccepted(a.data as RequestDetail[]);
     setBatches(b.data as BatchRow[]);
     setVersion((v) => v + 1);
@@ -44,8 +48,8 @@ export function BatchesClient() {
   }, [load, tick]);
 
   const students = React.useMemo(() => Object.fromEntries(accepted.map((s) => [s.student_id, { name: s.student_name, reg_no: s.reg_no }])), [accepted]);
-  const sheet = React.useMemo(() => buildSheetRows(batches, students, faculty.name), [batches, students, faculty.name]);
-  const guide = { name: faculty.name, empId: faculty.emp_id, cadre: faculty.cadre };
+  const sheet = React.useMemo(() => buildSheetRows(batches, students, faculty.name, { applications: apps }), [batches, students, faculty.name, apps]);
+  const guide = { name: faculty.name, empId: faculty.emp_id };
   const count = batchesForCadre(faculty.cadre);
   const byNo = new Map(batches.map((b) => [b.batch_no, b]));
   const placed = new Set(batches.flatMap((b) => b.batch_members.map((m) => m.student_id)));
@@ -144,6 +148,12 @@ export function BatchesClient() {
                       <td className="border border-slate-400/60 px-3 py-2">{r.advisor}</td>
                       <td className="border border-slate-400/60 px-3 py-2">{r.phone}</td>
                       <td className="border border-slate-400/60 px-3 py-2">{r.mail}</td>
+                      <td className="border border-slate-400/60 px-3 py-2">{r.studentMobile}</td>
+                      {r.first && (
+                        <td rowSpan={2} className="border border-slate-400/60 px-3 py-2 align-middle">
+                          {r.projectTitle}
+                        </td>
+                      )}
                       <td className="border border-slate-400/60 px-3 py-2">{r.guideName}</td>
                     </tr>
                   ))}

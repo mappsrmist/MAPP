@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type Kind = "students" | "faculty";
+type Kind = "students" | "faculty" | "advisors";
 
 const TEMPLATES: Record<Kind, { header: string[]; sample: string[]; note: string }> = {
   students: {
@@ -19,8 +19,13 @@ const TEMPLATES: Record<Kind, { header: string[]; sample: string[]; note: string
   },
   faculty: {
     header: IMPORT_HEADERS.faculty,
-    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "Professor", "OTHER", "9876543210", "TP 801", "AI;Machine Learning"],
-    note: "cadre: HOD, ASSOC_CHAIR or OTHER. domains: separate with semicolons. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
+    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI;Machine Learning", "OTHER"],
+    note: "cadre: HOD, ASSOC_CHAIR or OTHER (it sets the seat and batch counts and is never shown). domains: separate with semicolons. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
+  },
+  advisors: {
+    header: IMPORT_HEADERS.advisors,
+    sample: ["EMP1001", "A"],
+    note: "One row per section; a faculty member may appear on several rows. Unknown employee IDs, unknown sections and sections already assigned to someone else are reported per row. Re-uploading the same mapping changes nothing.",
   },
 };
 
@@ -31,8 +36,8 @@ interface RowError {
   message: string;
 }
 
-export function ImportClient() {
-  const [kind, setKind] = React.useState<Kind>("students");
+export function ImportClient({ initialKind = "students" }: { initialKind?: Kind }) {
+  const [kind, setKind] = React.useState<Kind>(initialKind);
   const [rows, setRows] = React.useState<Record<string, string>[] | null>(null);
   const [fileName, setFileName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -122,19 +127,19 @@ export function ImportClient() {
 
   return (
     <>
-      <PageHeader title="Import data" description="Upload an Excel (.xlsx) workbook to create or update students and faculty. Re-uploading updates existing users without duplicating them." />
+      <PageHeader title="Import data" description="Upload an Excel (.xlsx) workbook to create or update students and faculty, or to map sections to their Faculty Advisors. Re-uploading updates existing users without duplicating them." />
 
       <div role="tablist" aria-label="Import type" className="mb-4 inline-flex gap-1 rounded-xl bg-muted p-1">
-        {(["students", "faculty"] as Kind[]).map((k) => (
+        {(["students", "faculty", "advisors"] as Kind[]).map((k) => (
           <button key={k} disabled={busy || reading} role="tab" aria-selected={kind === k} onClick={() => reset(k)} className={cn("cursor-pointer rounded-lg px-4 py-1.5 text-sm font-medium capitalize", kind === k ? "bg-card shadow-sm" : "text-muted-foreground")}>
-            {k}
+            {k === "advisors" ? "Faculty Advisors" : k}
           </button>
         ))}
       </div>
 
       <Card>
         <CardHeader>
-            <CardTitle className="capitalize">{kind} Excel workbook</CardTitle>
+            <CardTitle className="capitalize">{kind === "advisors" ? "Faculty Advisors" : kind} Excel workbook</CardTitle>
           <CardDescription>{t.note}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -164,7 +169,7 @@ export function ImportClient() {
           )}
 
           <Button disabled={reading || !rows || rows.length === 0} loading={busy || reading} onClick={runImport}>
-            Import {rows ? rows.length : ""} {kind}
+            Import {rows ? rows.length : ""} {kind === "advisors" ? "mapping(s)" : kind}
           </Button>
         </CardContent>
       </Card>
@@ -176,7 +181,7 @@ export function ImportClient() {
               <CheckCircle2 className="h-5 w-5 text-success" aria-hidden /> Import result
             </CardTitle>
             <CardDescription>
-              {result.created} created · {result.updated} updated · {result.errors.length} error(s)
+              {result.created} {kind === "advisors" ? "added" : "created"} · {result.updated} {kind === "advisors" ? "unchanged" : "updated"} · {result.errors.length} error(s)
             </CardDescription>
           </CardHeader>
           {result.errors.length > 0 && (

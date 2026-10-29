@@ -4,8 +4,8 @@ import { bodyTooLarge, isSameOrigin, readJsonBody } from "@/lib/server/origin";
 import { clearFailures, clientIp, loginKeys, recordFailure, retryAfter } from "@/lib/server/throttle";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators";
-import { usernameToEmail } from "@/lib/auth-utils";
-import { PORTAL_HOME, type Role } from "@/lib/config";
+import { resolveLogin } from "@/lib/auth-utils";
+import { PORTAL_HOME } from "@/lib/config";
 import { enforceRateLimit } from "@/lib/server/rate-limit";
 
 // One generic error for every failure mode so usernames cannot be enumerated.
@@ -21,13 +21,16 @@ async function handlePost(request: Request) {
   if (!isSameOrigin(request) || bodyTooLarge(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const parsed = loginSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
-  const { role, username, password } = parsed.data;
+  const { role: tab, username, password } = parsed.data;
+  // The admin has no tab of their own: the admin username on the Faculty tab selects the admin account.
+  const target = resolveLogin(tab, username);
+  const role = target.role;
 
   const keys = loginKeys(role, username, clientIp(request));
   const limited = await enforceRateLimit([
     // Campus NAT may carry the entire 3,000-student onboarding session.
     { key: `login:${keys[2].key}`, limit: 5000, window: 900 },
-    { key: `login:${keys[1].key}`, limit: 30, window: 900 },
+    { key: `login:${keys[1].key}`, limit: role === "admin" ? 10 : 30, window: 900 },
   ]);
   if (limited) return limited;
   try {
@@ -37,7 +40,7 @@ async function handlePost(request: Request) {
     return NextResponse.json({ error: "Sign-in is temporarily unavailable. Please try again shortly." }, { status: 503 });
   }
 
-  const email = usernameToEmail(role, username);
+  const email = target.email;
   if (!email) {
     await recordFailure(keys);
     return fail();
@@ -66,11 +69,21 @@ async function handlePost(request: Request) {
     return fail();
   }
 
+  // A removed student is refused exactly like a wrong password (their auth login is banned as well).
+  if (role === "student") {
+    const { data: student } = await supabase.from("students").select("is_active").eq("id", data.user.id).maybeSingle();
+    if (!student?.is_active) {
+      await supabase.auth.signOut();
+      await recordFailure(keys);
+      return fail();
+    }
+  }
+
   await clearFailures(keys);
   return NextResponse.json({
     role,
     mustChangePassword: profile.must_change_password,
-    redirect: profile.must_change_password ? "/force-password" : PORTAL_HOME[role as Role],
+    redirect: profile.must_change_password ? "/force-password" : PORTAL_HOME[role],
   });
 }
 

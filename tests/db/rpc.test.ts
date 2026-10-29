@@ -83,7 +83,7 @@ async function mkStudent(mustChange = false) {
 async function mkFaculty(cadre: "HOD" | "ASSOC_CHAIR" | "OTHER" = "OTHER", domains: string[] = ["AI"]) {
   const { id, k } = await mkProfile("faculty");
   await admin.query(
-    "insert into public.faculty (id, emp_id, name, srm_email, designation, cadre, phone, venue, domains) values ($1,$2,$3,$4,'Prof',$5,'9999999999','Room 1',$6)",
+    "insert into public.faculty (id, emp_id, name, srm_email, cadre, phone, venue, domains) values ($1,$2,$3,$4,$5,'9999999999','Room 1',$6)",
     [id, `E${k}`, `Faculty ${k}`, `f${k}@srmist.edu.in`, cadre, domains],
   );
   return id;
@@ -270,7 +270,7 @@ describe("MOOC <-> Minor exclusivity (d)", () => {
   it("opting MOOC locks Minor (RPC level)", async () => {
     const s = await mkStudent();
     const f = await mkFaculty();
-    await as(s, (q) => q("select public.opt_mooc()"));
+    await as(s, (q) => q("select public.opt_mooc(9.5)"));
     await expect(request(s, f)).rejects.toThrow(/MOOC/);
     await expect(as(s, (q) => q("select * from public.list_faculty(null,null,1)"))).rejects.toThrow(/unavailable/i);
     await expect(as(s, (q) => q("select * from public.get_faculty($1)", [f]))).rejects.toThrow(/unavailable/i);
@@ -280,13 +280,13 @@ describe("MOOC <-> Minor exclusivity (d)", () => {
     const s = await mkStudent();
     const f = await mkFaculty();
     await request(s, f);
-    await expect(as(s, (q) => q("select public.opt_mooc()"))).rejects.toThrow(/active Minor/i);
+    await expect(as(s, (q) => q("select public.opt_mooc(9.5)"))).rejects.toThrow(/active Minor/i);
   });
 
   it("cannot opt for MOOC twice", async () => {
     const s = await mkStudent();
-    await as(s, (q) => q("select public.opt_mooc()"));
-    await expect(as(s, (q) => q("select public.opt_mooc()"))).rejects.toThrow(/already opted/i);
+    await as(s, (q) => q("select public.opt_mooc(9.5)"));
+    await expect(as(s, (q) => q("select public.opt_mooc(9.5)"))).rejects.toThrow(/already opted/i);
   });
 });
 
@@ -347,7 +347,7 @@ describe("RLS & privileges", () => {
 
   it("users who still must change their password are blocked", async () => {
     const s = await mkStudent(true);
-    await expect(as(s, (q) => q("select public.opt_mooc()"))).rejects.toThrow(/change your password/i);
+    await expect(as(s, (q) => q("select public.opt_mooc(9.5)"))).rejects.toThrow(/change your password/i);
     const rows = await as(s, async (q) => (await q("select * from public.students")).rows);
     expect(rows).toHaveLength(1); // may still read own row (needed to render the forced-change screen)
   });
@@ -375,7 +375,7 @@ describe("privileges (hardening)", () => {
         await admin.query("rollback");
       }
     };
-    await expect(run("select public.opt_mooc()")).rejects.toThrow(/permission denied/i);
+    await expect(run("select public.opt_mooc(9.5)")).rejects.toThrow(/permission denied/i);
     await expect(run("select public.list_faculty(null,null,1)")).rejects.toThrow(/permission denied/i);
     await expect(run("select * from public.students")).rejects.toThrow(/permission denied/i);
     await expect(run("select * from public.request_details_v")).rejects.toThrow(/permission denied/i);

@@ -119,7 +119,7 @@ async function mkStudent(section: string | null = "A") {
 async function mkFaculty(cadre: "HOD" | "ASSOC_CHAIR" | "OTHER" = "OTHER", domains: string[] = ["AI"]) {
   const { id, k } = await mkProfile("faculty");
   await admin.query(
-    "insert into public.faculty (id, emp_id, name, srm_email, designation, cadre, phone, venue, domains) values ($1,$2,$3,$4,'Assistant Professor',$5,'9999999999','Room 1',$6)",
+    "insert into public.faculty (id, emp_id, name, srm_email, cadre, phone, venue, domains) values ($1,$2,$3,$4,$5,'9999999999','Room 1',$6)",
     [id, `V${k}`, `Guide ${k}`, `g${k}@srmist.edu.in`, cadre, domains],
   );
   return id;
@@ -198,7 +198,7 @@ describe("A1: MOOC <-> Minor lock", () => {
   it("every Minor RPC rejects a MOOC student, including direct calls", async () => {
     const f = await mkFaculty();
     const s = await mkStudent();
-    await as(s, (q) => q("select public.opt_mooc()"));
+    await as(s, (q) => q("select public.opt_mooc(9.5)"));
     const msg = /MOOC course\. The Minor Project dashboard is unavailable/;
     await expect(as(s, (q) => q("select * from public.list_faculty(null,null,1)"))).rejects.toThrow(msg);
     await expect(as(s, (q) => q("select * from public.list_domains()"))).rejects.toThrow(msg);
@@ -210,7 +210,7 @@ describe("A1: MOOC <-> Minor lock", () => {
     const f = await mkFaculty();
     const s = await mkStudent();
     await request(s, f);
-    await expect(as(s, (q) => q("select public.opt_mooc()"))).rejects.toThrow(/active Minor project request/);
+    await expect(as(s, (q) => q("select public.opt_mooc(9.5)"))).rejects.toThrow(/active Minor project request/);
   });
 });
 
@@ -250,7 +250,7 @@ describe("A2: multi-domain faculty list", () => {
 
 describe("A4: application form gate", () => {
   const gate = /opens only after your guide accepts/;
-  it("is blocked with no request, pending and declined; allowed after accept", async () => {
+  it("is blocked until the guide accepts and completes a batch", async () => {
     const f = await mkFaculty();
     const s = await mkStudent();
     await expect(getApp(s)).rejects.toThrow(gate);
@@ -262,6 +262,8 @@ describe("A4: application form gate", () => {
     await expect(saveApp(s)).rejects.toThrow(gate);
     const s2 = await mkStudent();
     await respond(f, await request(s2, f), "accepted");
+    await expect(getApp(s2)).rejects.toThrow(/batch/);
+    await group(f, 1, s2, await accepted(f));
     const form = await getApp(s2);
     expect(form).toMatchObject({ application_id: null, s1_reg: expect.stringMatching(/^RB/), can_edit: true });
   });
@@ -269,6 +271,7 @@ describe("A4: application form gate", () => {
     const f = await mkFaculty();
     const other = await mkFaculty();
     const s = await accepted(f);
+    await group(f, 1, s, await accepted(f));
     await saveApp(s);
     const form = await getApp(s);
     const real = (await admin.query("select name, emp_id, phone from public.faculty where id=$1", [f])).rows[0];
@@ -281,11 +284,12 @@ describe("A4: application form gate", () => {
   it("validates SDG, mobile, SRM mail and reg no; submit needs everything and then locks edits", async () => {
     const f = await mkFaculty();
     const s = await accepted(f);
+    await group(f, 1, s, await accepted(f));
     await expect(saveApp(s, { 1: "No Poverty" })).rejects.toThrow(/SDG/);
     await expect(saveApp(s, { 1: "18. Nothing" })).rejects.toThrow(/SDG/);
     await expect(saveApp(s, { 4: "12345" })).rejects.toThrow(/10 digits/);
     await expect(saveApp(s, { 8: "partner@gmail.com" })).rejects.toThrow(/srmist\.edu\.in/);
-    await expect(saveApp(s, { 6: "x y" })).rejects.toThrow(/registration number/);
+    // Batch partner identity overrides registration data supplied by the browser.
     await expect(saveApp(s, { 0: null }, true)).rejects.toThrow(/every field/);
     const id = await saveApp(s, {}, true);
     expect((await getApp(s)).status).toBe("submitted");
@@ -313,8 +317,10 @@ describe("A4: application form gate", () => {
   it("a student cannot be in two applications and others cannot see a team's application", async () => {
     const f = await mkFaculty();
     const [a, b, c] = [await accepted(f), await accepted(f), await accepted(f)];
-    await saveApp(a, { 6: "RA9000001" });
-    await expect(saveApp(b, { 6: "RA9000001" })).rejects.toThrow(/already part of another application/);
+    await group(f, 1, a, b);
+    await group(f, 2, c, await accepted(f));
+    const sharedId = await saveApp(a, { 6: "RA9000001" });
+    expect(await saveApp(b, { 6: "RA9000001" })).toBe(sharedId);
     const seen = await as(c, async (q) => (await q("select count(*)::int n from public.applications")).rows[0].n);
     expect(seen).toBe(0);
     const guide = await as(f, async (q) => (await q("select count(*)::int n from public.applications")).rows[0].n);
@@ -325,6 +331,7 @@ describe("A4: application form gate", () => {
   it("losing the accepted guide removes the application and closes the form", async () => {
     const f = await mkFaculty();
     const s = await accepted(f);
+    await group(f, 1, s, await accepted(f));
     await saveApp(s);
     const rid = (await admin.query("select id from public.requests where student_id=$1", [s])).rows[0].id;
     const a = await mkAdmin();
@@ -402,7 +409,7 @@ describe("C1: freeze", () => {
       const frozen = /frozen by the admin/;
       const d = await mkStudent();
       await expect(request(d, f)).rejects.toThrow(frozen);
-      await expect(as(d, (q) => q("select public.opt_mooc()"))).rejects.toThrow(frozen);
+      await expect(as(d, (q) => q("select public.opt_mooc(9.5)"))).rejects.toThrow(frozen);
       await expect(respond(f, pending, "accepted")).rejects.toThrow(frozen);
       await expect(respond(f, pending, "declined")).rejects.toThrow(frozen);
       await expect(group(f, 2, a, b)).rejects.toThrow(frozen);
@@ -503,6 +510,43 @@ describe("C2: admin allocation actions", () => {
     const adm = await mkAdmin();
     const rows = await as(adm, async (q) => (await q("select display_status, count(*)::int n from public.request_details_v where faculty_id=$1 group by 1", [f])).rows);
     expect(Object.fromEntries(rows.map((r) => [r.display_status, r.n]))).toEqual({ grouped: 2, pending: 1 });
+  });
+});
+
+
+describe("student eligibility updates", () => {
+  it("hides faculty with zero seats from the student list", async () => {
+    const f = await mkFaculty("ASSOC_CHAIR");
+    for (let i = 0; i < 4; i++) await accepted(f);
+    const student = await mkStudent();
+    const emp = (await admin.query("select emp_id from public.faculty where id=$1", [f])).rows[0].emp_id;
+    const list = await as(student, (q) => q("select * from public.list_faculty($1,null,1)", [emp]));
+    expect(list.rows).toHaveLength(0);
+  });
+  it("requires a CGPA strictly above 9 and no higher than 10", async () => {
+    const s = await mkStudent();
+    for (const cgpa of [null, 0, 8.99, 9, 10.01, "NaN", "Infinity"]) {
+      await expect(as(s, (q) => q("select public.opt_mooc($1::numeric)", [cgpa]))).rejects.toThrow(/CGPA/);
+    }
+    await as(s, (q) => q("select public.opt_mooc($1::numeric)", [9.01]));
+    expect((await admin.query("select mooc_cgpa from public.students where id=$1", [s])).rows[0].mooc_cgpa).toBe("9.01");
+  });
+  it("requires a faculty batch for both reading and saving an application", async () => {
+    const f = await mkFaculty();
+    const a = await accepted(f);
+    await expect(getApp(a)).rejects.toThrow(/batch/);
+    await expect(saveApp(a)).rejects.toThrow(/batch/);
+    const b = await accepted(f);
+    const bid = await group(f, 1, a, b);
+    expect(await getApp(a)).toMatchObject({ guide_department: "Computing Technologies", s2_locked: true });
+    const membership = await as(a, (q) => q("select batch_id from public.batch_members where student_id=auth.uid()"));
+    expect(membership.rows).toEqual([{ batch_id: bid }]);
+    await saveApp(a);
+    await as(f, (q) => q("select public.ungroup_batch($1)", [bid]));
+    await expect(getApp(a)).rejects.toThrow(/batch/);
+    await expect(saveApp(a)).rejects.toThrow(/batch/);
+    const direct = await as(a, (q) => q("select * from public.applications"));
+    expect(direct.rows).toHaveLength(0);
   });
 });
 

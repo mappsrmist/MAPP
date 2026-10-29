@@ -17,11 +17,13 @@ export interface ThrottleKey {
 }
 
 export function loginKeys(role: string, username: string, ip: string): ThrottleKey[] {
-  // Every admin alias addresses the same account and must share its attempt budget.
-  const user = role === "admin" ? "admin" : `${role}:${username.trim().toLowerCase().slice(0, 200)}`;
+  // Every admin alias addresses the same account and must share its attempt budget, which is stricter
+  // than a normal account's: 3 failures per IP and 10 overall per window.
+  const isAdmin = role === "admin";
+  const user = isAdmin ? "admin" : `${role}:${username.trim().toLowerCase().slice(0, 200)}`;
   return [
-    { key: `uip:${user}:${ip}`, max: 5 },
-    { key: `u:${user}`, max: 30 },
+    { key: `uip:${user}:${ip}`, max: isAdmin ? 3 : 5 },
+    { key: `u:${user}`, max: isAdmin ? 10 : 30 },
     { key: `ip:${ip}`, max: 300 },
   ];
 }

@@ -4,22 +4,27 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Info } from "lucide-react";
 import { toast } from "sonner";
+import { Field, Input } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, PageHeader } from "@/components/ui/card";
 import { ConfirmDialog, MessageDialog } from "@/components/ui/dialog";
 import { useGlobalFreeze } from "@/components/freeze";
 import { MOOC_IMPORTANT, MOOC_RULES, MOOC_TITLE, MSG } from "@/lib/config";
 import { createClient } from "@/lib/supabase/client";
+import type { StudentChoice } from "@/lib/types";
 
-export function MoocClient({ choice }: { choice: "mooc" | "minor" | null }) {
+export function MoocClient({ choice }: { choice: StudentChoice }) {
   const router = useRouter();
   const frozen = useGlobalFreeze();
+  const [cgpa, setCgpa] = React.useState("");
+  const eligible = cgpa.trim() !== "" && Number.isFinite(Number(cgpa)) && Number(cgpa) > 9 && Number(cgpa) <= 10;
   const [agree, setAgree] = React.useState(false);
   const [confirm, setConfirm] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
 
   async function optIn() {
-    const { error } = await createClient().rpc("opt_mooc");
+    if (!eligible || !agree || frozen) return;
+    const { error } = await createClient().rpc("opt_mooc", { p_cgpa: Number(cgpa) });
     if (error) {
       toast.error(error.message);
       router.refresh();
@@ -96,7 +101,13 @@ export function MoocClient({ choice }: { choice: "mooc" | "minor" | null }) {
         description="You will not be able to apply for a Minor project after this. Do you want to continue?"
         confirmLabel="Yes, opt for MOOC"
         onConfirm={optIn}
-      />
+        confirmDisabled={!eligible || !agree || frozen}
+      >
+        <Field label="Your CGPA" htmlFor="mooc-cgpa">
+          <Input id="mooc-cgpa" type="number" min="9.01" max="10" step="0.01" value={cgpa} onChange={(e) => setCgpa(e.target.value)} />
+          <p className="mt-2 text-sm text-muted-foreground">Enter your current CGPA. It must be greater than 9 and no higher than 10.</p>
+        </Field>
+      </ConfirmDialog>
       <MessageDialog
         open={success}
         onOpenChange={setSuccess}

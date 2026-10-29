@@ -18,7 +18,7 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const doc = await PDFDocument.create();
   doc.setTitle("Guide Acceptance Form - 21CSP302L Minor Project");
-  const page = doc.addPage([595, 842]);
+  let page = doc.addPage([595, 842]);
   const regular = await doc.embedFont(StandardFonts.TimesRoman);
   const bold = await doc.embedFont(StandardFonts.TimesRomanBold);
   type Font = typeof regular;
@@ -31,6 +31,7 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   let y = 810;
 
   const centered = (text: string, size: number, underline = false) => {
+    size += 1;
     const w = bold.widthOfTextAtSize(text, size);
     const x = left + (width - w) / 2;
     page.drawText(text, { x, y, size, font: bold, color: ink });
@@ -42,10 +43,10 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   centered("SCHOOL OF COMPUTING", 12);
   centered("DEPARTMENT OF COMPUTING TECHNOLOGIES", 12);
   centered("21CSP302L - MINOR PROJECT", 12);
-  centered("VI SEMESTER - (2025 - 2026 Even)", 12);
+  centered("VI SEMESTER - (2026 - 2027 Even)", 12);
   centered("GUIDE ACCEPTANCE FORM", 12, true);
   const dateLabel = `Date: ${today()}`;
-  page.drawText(dateLabel, { x: left + width - bold.widthOfTextAtSize(dateLabel, 11), y: y + 2, size: 11, font: bold, color: ink });
+  page.drawText(dateLabel, { x: left + width - bold.widthOfTextAtSize(dateLabel, 12), y: y + 2, size: 12, font: bold, color: ink });
   y -= 10;
 
   // Wraps on spaces and hard-breaks any single word wider than the cell (e.g. a long e-mail address).
@@ -83,16 +84,20 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   const row = (cells: Cell[], minH = 22) => {
     const laid = cells.map((c) => {
       const font = c.font ?? regular;
-      const size = c.size ?? 11;
+      const size = (c.size ?? 11) + 1;
       const lines = c.text ? wrap(c.text, font, size, c.w - pad * 2) : [];
-      const subLines = c.sub ? wrap(c.sub, regular, 9, c.w - pad * 2) : [];
-      return { c, font, size, lines, subLines, h: lines.length * (size + 3) + subLines.length * 12 + 12 };
+      const subLines = c.sub ? wrap(c.sub, regular, 10, c.w - pad * 2) : [];
+      return { c, font, size, lines, subLines, h: lines.length * (size + 3) + subLines.length * 13 + 12 };
     });
     const h = Math.max(minH, ...laid.map((l) => l.h));
+    if (y - h < 40) {
+      page = doc.addPage([595, 842]);
+      y = 800;
+    }
     let x = left;
     for (const { c, font, size, lines, subLines } of laid) {
       page.drawRectangle({ x, y: y - h, width: c.w, height: h, borderColor: ink, borderWidth: 0.8 });
-      const textH = lines.length * (size + 3) + subLines.length * 12;
+      const textH = lines.length * (size + 3) + subLines.length * 13;
       let ty = y - (h - textH) / 2 - size + 2;
       for (const l of lines) {
         const tx = c.center ? x + (c.w - font.widthOfTextAtSize(l, size)) / 2 : x + pad;
@@ -100,8 +105,8 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
         ty -= size + 3;
       }
       for (const l of subLines) {
-        page.drawText(l, { x: x + pad, y: ty, size: 9, font: regular, color: ink });
-        ty -= 12;
+        page.drawText(l, { x: x + pad, y: ty, size: 10, font: regular, color: ink });
+        ty -= 13;
       }
       x += c.w;
     }
@@ -134,38 +139,48 @@ export async function buildApplicationPdf(form: ApplicationForm): Promise<Uint8A
   row([{ text: "Guide Details", font: bold, center: true, w: width }], 20);
   const guide = (label: string, v: string, minH = 26) => row([{ text: label, w: c1 }, { text: v, w: wide }], minH);
   guide("Guide Name / Emp ID", [val(form.guide_name), val(form.guide_emp_id)].filter(Boolean).join(" / "));
-  guide("Designation / Department", "");
+  guide("Department", val(form.guide_department));
   guide("Contact Number", val(form.guide_phone));
   guide("Signature of the Guide", "", 34);
 
   // notes
   y -= 14;
-  const noteSize = 9.5;
-  page.drawText("*", { x: left - 12, y, size: 10, font: regular, color: ink });
+  const noteSize = 10.5;
+  const ensureNoteLine = () => {
+    if (y < 40) { page = doc.addPage([595, 842]); y = 800; }
+  };
+  ensureNoteLine();
+  page.drawText("*", { x: left - 12, y, size: 11, font: regular, color: ink });
   const lead = [
     { t: "Note:", f: bold },
     { t: " The project title must align with one of the following ", f: regular },
     { t: "Sustainable Development Goals (SDGs):", f: bold },
   ];
-  let x = left;
-  for (const { t, f } of lead) {
-    page.drawText(t, { x, y, size: noteSize, font: f, color: ink });
-    x += f.widthOfTextAtSize(t, noteSize);
-  }
+  const richLine = (parts: { t: string; f: Font }[], start: number) => {
+    let x = start;
+    for (const { t, f } of parts) {
+      for (const word of t.match(/\S+\s*|^\s+/g) ?? []) {
+        const w = f.widthOfTextAtSize(word, noteSize);
+        if (x + w > left + width && x > start) { x = start; y -= 15; }
+        ensureNoteLine();
+        page.drawText(word, { x, y, size: noteSize, font: f, color: ink });
+        x += w;
+      }
+    }
+  };
+  richLine(lead, left);
   y -= 15;
   NOTE_SDGS.forEach((s, i) => {
+    ensureNoteLine();
     page.drawText(`${i + 1}.   ${s}`, { x: left + 14, y, size: noteSize, font: regular, color: ink });
     y -= 14;
   });
   y -= 4;
 
   const bullet = (parts: { t: string; f: Font }[]) => {
+    ensureNoteLine();
     page.drawCircle({ x: left - 6, y: y + 3, size: 1.8, color: ink });
-    let bx = left + 4;
-    for (const { t, f } of parts) {
-      page.drawText(t, { x: bx, y, size: noteSize, font: f, color: ink });
-      bx += f.widthOfTextAtSize(t, noteSize);
-    }
+    richLine(parts, left + 4);
     y -= 15;
   };
   bullet([

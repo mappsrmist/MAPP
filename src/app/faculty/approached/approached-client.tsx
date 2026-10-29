@@ -48,6 +48,8 @@ export function ApproachedClient() {
       dept: r.dept,
       section: r.student_section ?? "",
       email: r.student_email ?? "",
+      mobile: r.student_mobile ?? "",
+      title: r.project_title ?? "",
       batch: r.batch_no ? `B${r.batch_no}` : "Unassigned",
       accepted: r.responded_at ? new Date(r.responded_at).toLocaleDateString("en-GB") : "",
     }));
@@ -57,6 +59,8 @@ export function ApproachedClient() {
       { header: "Dept", key: "dept", width: 14 },
       { header: "Section", key: "section", width: 10 },
       { header: "Email", key: "email", width: 32 },
+      { header: "Student Mobile No.", key: "mobile", width: 18 },
+      { header: "Project Title", key: "title", width: 36 },
       { header: "Batch", key: "batch", width: 12 },
       { header: "Accepted On", key: "accepted", width: 14 },
     ], rows);
@@ -100,6 +104,9 @@ export function ApproachedClient() {
           { header: H[0], cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
           { header: H[1], cell: (r) => <span className="font-medium">{r.student_name}</span> },
           { header: H[2], cell: (r) => r.student_section ?? "—" },
+          // filled in from the team's Application Form once the student is accepted
+          { header: "Project Title", cell: (r) => (r.status === "accepted" ? r.project_title || "—" : "—") },
+          { header: "Mobile No.", cell: (r) => (r.status === "accepted" ? r.student_mobile || "—" : "—") },
           { header: H[3], cell: (r) => <StatusBadge status={r.status} /> },
           {
             header: H[4],

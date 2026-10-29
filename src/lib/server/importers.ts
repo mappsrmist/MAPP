@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STUDENT_EMAIL_DOMAIN } from "@/lib/config";
-import type { FacultyImportRow, StudentRow } from "@/lib/validators";
+import type { AdvisorImportRow, FacultyImportRow, StudentRow } from "@/lib/validators";
 
 type Admin = SupabaseClient;
 type Role = "student" | "faculty";
@@ -79,7 +79,6 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
       emp_id: row.emp_id,
       name: row.name,
       srm_email: row.srm_email,
-      designation: row.designation,
       cadre: row.cadre,
       phone: row.phone,
       venue: row.venue,
@@ -92,4 +91,17 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
     throw new Error("Could not save the faculty member (duplicate employee ID or email?)");
   }
   return { created };
+}
+
+/**
+ * Maps one section to its Faculty Advisor. Idempotent: the same mapping again is "unchanged". A section that already
+ * belongs to a different advisor is rejected here (the admin replaces it deliberately on the Faculty Advisors page).
+ */
+export async function upsertAdvisor(admin: Admin, row: AdvisorImportRow): Promise<Upserted & { unchanged: boolean }> {
+  const { data, error } = await admin.rpc("_set_fa", { p_emp_id: row.emp_id, p_section: row.section, p_replace: false });
+  if (error) {
+    // the database messages are written for the admin ("Unknown employee ID.", "Section X is already assigned to Y.")
+    throw new Error(error.message);
+  }
+  return { created: data === "added", unchanged: data === "unchanged" };
 }

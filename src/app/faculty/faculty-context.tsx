@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Armchair, Layers, UserCheck, Users } from "lucide-react";
+import { Armchair, Layers, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { FreezeBanner, useGlobalFreeze } from "@/components/freeze";
-import { CADRE_LABEL, FACULTY_COLS, MSG, batchesForCadre } from "@/lib/config";
+import { FACULTY_COLS, MSG, batchesForCadre } from "@/lib/config";
 import { useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
 import type { FacultyRow } from "@/lib/types";
@@ -68,7 +68,6 @@ export function FacultyProvider({ initial, children }: { initial: FacultyRow; ch
 
   const total = batchesForCadre(faculty.cadre);
   const stats = [
-    { label: "Cadre", value: CADRE_LABEL[faculty.cadre], icon: <Users className="h-4 w-4" /> },
     { label: "Total seats", value: faculty.total_seats, icon: <Armchair className="h-4 w-4" /> },
     { label: "Filled", value: faculty.accepted_count, icon: <UserCheck className="h-4 w-4" /> },
     { label: "Available seats", value: faculty.available_seats, icon: <Armchair className="h-4 w-4" />, highlight: true },
@@ -77,7 +76,7 @@ export function FacultyProvider({ initial, children }: { initial: FacultyRow; ch
   return (
     <FacultyCtx.Provider value={value}>
       {faculty.frozen && !globalFrozen && <FreezeBanner message={MSG.FROZEN_FACULTY} />}
-      <section aria-label="Seat summary" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <section aria-label="Seat summary" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
           <Card key={s.label} className={s.highlight ? "border-primary/50 bg-accent/60 p-4" : "p-4"}>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

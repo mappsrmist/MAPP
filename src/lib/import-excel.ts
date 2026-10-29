@@ -2,10 +2,11 @@
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 export const MAX_IMPORT_ROWS = 5000;
 const MAX_EXPANDED_BYTES = 20 * 1024 * 1024;
-export type ImportKind = "students" | "faculty";
+export type ImportKind = "students" | "faculty" | "advisors";
 export const IMPORT_HEADERS: Record<ImportKind, string[]> = {
   students: ["reg_no", "name", "dept", "section", "email"],
-  faculty: ["emp_id", "name", "srm_email", "designation", "cadre", "phone", "venue", "domains"],
+  faculty: ["emp_id", "name", "srm_email", "phone", "venue", "domains", "cadre"],
+  advisors: ["emp_id", "section"],
 };
 const OPTIONAL_HEADERS = new Set(["email", "phone", "venue", "domains"]);
 

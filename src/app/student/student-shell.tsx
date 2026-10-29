@@ -6,13 +6,14 @@ import { PortalShell, type NavItem } from "@/components/portal-shell";
 import { MSG } from "@/lib/config";
 import { useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
+import type { StudentChoice } from "@/lib/types";
 
 interface Props {
   userId: string;
   name: string;
   regNo: string;
-  choice: "mooc" | "minor" | null;
-  /** the student has a Minor request that a guide accepted */
+  choice: StudentChoice;
+  /** the student belongs to a faculty-formed Minor batch */
   accepted: boolean;
   frozen: boolean;
   children: React.ReactNode;
@@ -29,7 +30,7 @@ export function StudentShell({ userId, name, regNo, choice, accepted, frozen, ch
     const supabase = createClient();
     const [s, r] = await Promise.all([
       supabase.from("students").select("choice").eq("id", userId).maybeSingle(),
-      supabase.from("requests").select("id").eq("student_id", userId).eq("project_type", "minor").eq("status", "accepted").limit(1),
+      supabase.from("batch_members").select("batch_id").eq("student_id", userId).eq("project_type", "minor").limit(1),
     ]);
     if (s.error || r.error) return;
     setLive({ choice: (s.data?.choice as Props["choice"]) ?? null, accepted: (r.data?.length ?? 0) > 0 });
@@ -37,14 +38,26 @@ export function StudentShell({ userId, name, regNo, choice, accepted, frozen, ch
 
   useRealtime([{ table: "requests", filter: `student_id=eq.${userId}` }, { table: "students", filter: `id=eq.${userId}` }], () => void load());
 
+  React.useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const timer = setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    return () => { clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [load]);
+
   const state = live ?? { choice, accepted };
   const nav: NavItem[] = [
-    { href: "/student/mooc", label: "MOOC", icon: <BookOpenCheck className="h-4 w-4" /> },
+    {
+      href: "/student/mooc",
+      label: "MOOC",
+      icon: <BookOpenCheck className="h-4 w-4" />,
+      lockedMessage: state.choice === "exempt" ? MSG.EXEMPT : undefined,
+    },
     {
       href: "/student/minor",
       label: "Minor",
       icon: <FlaskConical className="h-4 w-4" />,
-      lockedMessage: state.choice === "mooc" ? MSG.MINOR_LOCKED : undefined,
+      lockedMessage: state.choice === "exempt" ? MSG.EXEMPT : state.choice === "mooc" ? MSG.MINOR_LOCKED : undefined,
     },
     {
       href: "/student/application",

@@ -1,5 +1,5 @@
 /** Browser-side Excel export helpers (exceljs is loaded on demand). */
-import { BATCH_COLUMNS, HEADER_FILL, fillForBatch, guideTitle, type GuideInfo, type SheetRow } from "./batch-sheet";
+import { BATCH_COLUMNS, GUIDE_EMP_COLUMN, HEADER_FILL, fillForBatch, guideTitle, type GuideInfo, type SheetRow } from "./batch-sheet";
 
 /** Neutralise spreadsheet formula injection: cells starting with = + - @ (or tab/CR) are prefixed with '. */
 export function safeCell<T>(v: T): T | string {
@@ -62,6 +62,8 @@ export interface BatchWorkbookSheet {
   /** Text of the title row above the table (e.g. the guide line). */
   title: string;
   rows: SheetRow[];
+  /** admin sheets: lead each row with the guide's Employee ID */
+  leadEmpId?: boolean;
 }
 
 /**
@@ -72,19 +74,23 @@ export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   const used = new Set<string>();
-  const widths = [12, 28, 20, 12, 28, 16, 32, 28];
+  const widths = [12, 28, 20, 12, 28, 16, 32, 16, 36, 28];
 
   sheets.forEach((sheet) => {
     const ws = wb.addWorksheet(sheetName(sheet.name, used));
-    ws.columns = widths.map((width) => ({ width }));
+    const lead = sheet.leadEmpId ? 1 : 0;
+    ws.columns = (lead ? [16, ...widths] : widths).map((width) => ({ width }));
+    const colCount = BATCH_COLUMNS.length + lead;
+    const batchCol = 1 + lead;
+    const titleCol = 1 + lead + BATCH_COLUMNS.indexOf("Project Title");
 
-    ws.mergeCells(1, 1, 1, BATCH_COLUMNS.length);
+    ws.mergeCells(1, 1, 1, colCount);
     const title = ws.getCell(1, 1);
     title.value = safeCell(sheet.title);
     title.font = { bold: true, size: 12 };
     title.alignment = { vertical: "middle", horizontal: "left" };
 
-    const header = ws.addRow([...BATCH_COLUMNS]);
+    const header = ws.addRow(lead ? [GUIDE_EMP_COLUMN, ...BATCH_COLUMNS] : [...BATCH_COLUMNS]);
     header.eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${HEADER_FILL}` } };
@@ -94,6 +100,7 @@ export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
 
     sheet.rows.forEach((r) => {
       const row = ws.addRow([
+        ...(lead ? [safeCell(r.guideEmpId)] : []),
         r.first ? r.batchLabel : "",
         safeCell(r.name),
         safeCell(r.regNo),
@@ -101,18 +108,21 @@ export async function buildBatchWorkbook(sheets: BatchWorkbookSheet[]) {
         safeCell(r.advisor),
         safeCell(r.phone),
         safeCell(r.mail),
+        safeCell(r.studentMobile),
+        r.first ? safeCell(r.projectTitle) : "",
         safeCell(r.guideName),
       ]);
       row.eachCell({ includeEmpty: true }, (cell, col) => {
         cell.border = border;
-        cell.alignment = { vertical: "middle", horizontal: col === 1 ? "center" : "left" };
-        if (col === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${fillForBatch(r.batchNo)}` } };
+        cell.alignment = { vertical: "middle", horizontal: col === batchCol ? "center" : "left", wrapText: col === titleCol };
+        if (col === batchCol) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${fillForBatch(r.batchNo)}` } };
       });
       if (r.first) {
-        row.getCell(1).font = { bold: true };
+        row.getCell(batchCol).font = { bold: true };
       } else {
-        // merge the Batch No. cell over this batch's two rows
-        ws.mergeCells(row.number - 1, 1, row.number, 1);
+        // merge the Batch No. and Project Title cells over this batch's two rows
+        ws.mergeCells(row.number - 1, batchCol, row.number, batchCol);
+        ws.mergeCells(row.number - 1, titleCol, row.number, titleCol);
       }
     });
     ws.views = [{ state: "frozen", ySplit: 2 }];

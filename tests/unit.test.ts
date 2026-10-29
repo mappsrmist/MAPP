@@ -41,13 +41,13 @@ describe("validation", () => {
     expect(studentRowSchema.safeParse({ reg_no: "a@b.c", name: "A", dept: "CSE", section: "A" }).success).toBe(false);
   });
   it("needs an employee ID long enough to be the initial password", () => {
-    const row = { emp_id: "E1", name: "X", srm_email: "x@srmist.edu.in", designation: "P", cadre: "OTHER" };
+    const row = { emp_id: "E1", name: "X", srm_email: "x@srmist.edu.in", cadre: "OTHER" };
     expect(facultyRowSchema.safeParse(row).success).toBe(false);
     expect(facultyRowSchema.safeParse({ ...row, emp_id: "600323" }).success).toBe(true);
   });
   it("accepts a faculty row and normalises cadre/domains", () => {
     const r = facultyRowSchema.parse({
-      emp_id: "600323", name: "X", srm_email: "X@SRMIST.EDU.IN", designation: "Prof",
+      emp_id: "600323", name: "X", srm_email: "X@SRMIST.EDU.IN",
       cadre: "associate chair", domains: "AI; ML ;",
     });
     expect(r.cadre).toBe("ASSOC_CHAIR");
@@ -55,8 +55,8 @@ describe("validation", () => {
     expect(r.srm_email).toBe("x@srmist.edu.in");
   });
   it("rejects bad rows", () => {
-    expect(facultyRowSchema.safeParse({ emp_id: "600323", name: "X", srm_email: "nope", designation: "P", cadre: "BOSS" }).success).toBe(false);
-    const base = { emp_id: "600323", name: "X", designation: "P", cadre: "OTHER" };
+    expect(facultyRowSchema.safeParse({ emp_id: "600323", name: "X", srm_email: "nope", cadre: "BOSS" }).success).toBe(false);
+    const base = { emp_id: "600323", name: "X", cadre: "OTHER" };
     expect(facultyRowSchema.safeParse({ ...base, srm_email: "ra1@students.mapp.local" }).success).toBe(false);
     expect(facultyRowSchema.safeParse({ ...base, srm_email: "admin@mapp.local" }).success).toBe(false);
   });
@@ -144,8 +144,8 @@ describe("excel safety + batch sheet", () => {
     expect(fillForBatch(1)).not.toBe(fillForBatch(2));
   });
   it("uses the required column order and guide title", () => {
-    expect([...BATCH_COLUMNS]).toEqual(["Batch No.", "Name", "Registration No.", "Section", "Faculty Advisor Name", "Phone No.", "SRM Mail ID", "Guide Name"]);
-    expect(guideTitle({ name: "Deeban", empId: "600323", cadre: "OTHER" })).toBe("Guide: Deeban — Emp ID: 600323 — Cadre: Faculty");
+    expect([...BATCH_COLUMNS]).toEqual(["Batch No.", "Name", "Registration No.", "Section", "Faculty Advisor Name", "Phone No.", "SRM Mail ID", "Student Mobile No.", "Project Title", "Guide Name"]);
+    expect(guideTitle({ name: "Deeban", empId: "600323" })).toBe("Guide: Deeban — Emp ID: 600323");
   });
   it("writes the guide title row, the Guide Name column, per-student values and merged batch cells into the xlsx", async () => {
     const rows = buildSheetRows(
@@ -153,15 +153,15 @@ describe("excel safety + batch sheet", () => {
       people,
       "Deeban",
     );
-    const wb = await buildBatchWorkbook([{ name: "Batches", title: guideTitle({ name: "Deeban", empId: "600323", cadre: "OTHER" }), rows }]);
+    const wb = await buildBatchWorkbook([{ name: "Batches", title: guideTitle({ name: "Deeban", empId: "600323" }), rows }]);
     const ExcelJS = (await import("exceljs")).default;
     const back = new ExcelJS.Workbook();
     await back.xlsx.load((await wb.xlsx.writeBuffer()) as ArrayBuffer);
     const ws = back.getWorksheet("Batches")!;
-    expect(ws.getCell("A1").value).toBe("Guide: Deeban — Emp ID: 600323 — Cadre: Faculty");
+    expect(ws.getCell("A1").value).toBe("Guide: Deeban — Emp ID: 600323");
     expect(ws.getRow(2).values).toEqual([undefined, ...BATCH_COLUMNS]);
-    expect(ws.getCell("H3").value).toBe("Deeban");
-    expect(ws.getCell("H4").value).toBe("Deeban");
+    expect(ws.getCell("J3").value).toBe("Deeban");
+    expect(ws.getCell("J4").value).toBe("Deeban");
     expect(ws.getCell("A3").value).toBe("B1");
     expect(ws.getCell("A4").master.address).toBe("A3"); // Batch No. merged over both rows
     expect(ws.getCell("D3").value).toBe("A1");
@@ -177,7 +177,8 @@ describe("excel safety + batch sheet", () => {
       id: "r", status: "accepted", project_type: "minor", created_at: "", responded_at: null, faculty_id: "f1", faculty_emp_id: "E1",
       faculty_name: "Guide One", faculty_cadre: "OTHER", faculty_frozen: false, student_id: "s", reg_no: "RA1", student_name: "S",
       dept: "CSE", student_section: "A", student_email: null, batch_id: "b1", batch_no: 1, slot: 1, member_section: "A",
-      advisor_name: "Adv", contact_number: "9876543210", srm_mail: "adv@srmist.edu.in", section: "A", display_status: "grouped", ...o,
+      advisor_name: "Adv", contact_number: "9876543210", srm_mail: "adv@srmist.edu.in", section: "A", display_status: "grouped",
+      project_title: null, student_mobile: null, fa_name: null, ...o,
     });
     const sheets = sheetsFromDetails([
       det({ student_id: "s1", reg_no: "RA1", slot: 1 }),
@@ -186,7 +187,7 @@ describe("excel safety + batch sheet", () => {
       det({ student_id: "s4", status: "pending", batch_id: null, batch_no: null, slot: null, advisor_name: null }),
     ]);
     expect(sheets).toHaveLength(1);
-    expect(sheets[0].guide).toEqual({ name: "Guide One", empId: "E1", cadre: "OTHER" });
+    expect(sheets[0].guide).toEqual({ name: "Guide One", empId: "E1" });
     expect(sheets[0].rows.map((r) => [r.regNo, r.guideName])).toEqual([["RA1", "Guide One"], ["RA2", "Guide One"]]);
   });
 });
@@ -196,7 +197,7 @@ describe("application PDF", () => {
     application_id: "a", status: "submitted", faculty_id: "f", project_title: "Smart Campus ".repeat(12), sdg_goal: "1. No Poverty",
     problem_by_guide: true, s1_name: "அரவிந்த் Kumar", s1_reg: "RA2411003010058", s1_section: "A", s1_mail: "a@srmist.edu.in", s1_mobile: "9876543210",
     s2_name: "B", s2_reg: "RA2411003010059", s2_section: "A", s2_mail: "b@srmist.edu.in", s2_mobile: "9123456780", s2_locked: true,
-    guide_name: "Deeban", guide_emp_id: "600323", guide_phone: "9999999999", can_edit: false,
+    guide_name: "Deeban", guide_emp_id: "600323", guide_phone: "9999999999", guide_department: "Computing Technologies", can_edit: false,
   };
   it("produces a PDF even for long titles and names the standard fonts cannot encode", async () => {
     const bytes = await buildApplicationPdf(form);

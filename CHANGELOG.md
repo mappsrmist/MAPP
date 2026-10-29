@@ -1,5 +1,56 @@
 # Changelog
 
+## v3
+
+Upgrade order: apply `supabase/migrations/0009_v3.sql` **before** deploying the v3 code (additive; it replaces the student RPCs so they stop returning `designation`). After v3 is live, apply `0010_drop_designation.sql`. Migration `0008` (student eligibility) must already be applied.
+
+### A. Application title and mobile numbers
+- The columns and `save_application` already persisted `project_title`, `sdg_goal`, `problem_by_guide` and both students' mobiles; the gap was that nobody read them. A DB test now saves, reloads (as the partner) and reads them as the guide.
+- Faculty: new **Applications** page (`Batch | Team | Project Title | SDG Goal | Problem by Guide | Student Mobile No(s) | Status`, read-only, searchable, 10/page, Excel download). **Students Approached** shows Project Title and Mobile No. on accepted rows and in its accepted-students download.
+- `request_details_v` gained `project_title`, `student_mobile` and `fa_name`.
+- Faculty Excel and admin exports: `Batch No. | Name | Registration No. | Section | Faculty Advisor Name | Phone No. | SRM Mail ID | Student Mobile No. | Project Title | Guide Name`. Each student's own mobile; Project Title merged over the batch's two rows like Batch No.; blank when the form is not filled. The title row is now `Guide: <name> — Emp ID: <id>` (no cadre).
+
+### Allocations (admin) and its Excel
+- Table order: `Guide Emp ID | Guide Name | Batch | Reg No | Student | Section | Faculty Advisor Name | Project Title | Student Mail ID | Status | Action`, sorted by guide Emp ID, then batch, then slot.
+- *Table (Excel)* uses the same columns. *All allocations* leads every row with `Guide Emp ID`; it has a combined sheet plus one sheet per guide (`<EmpID> <Guide name>`), each batch showing its two students and the project title once.
+
+### B. Faculty Advisor
+- `faculty_advisors(section unique, normalised trim + upper case)`; `is_faculty_advisor()`, `my_fa_sections()`, `fa_class_counts()`, `fa_class_overview(section, search, status, page)`. Advisors see only their own sections; every RPC re-checks, and `/faculty/advisor` returns 404 for anyone else. The sidebar item appears only for advisors.
+- Class table: `Reg No | Name | Section | Student SRM Mail | Status | Guide | Request Status | Project Title`, count chips that filter, search, 10/page, Excel download, section switcher.
+
+### C. Admin
+- **Overview** now shows only Total Students, Total Faculty, Minor, MOOC Opted, Not Opted (+ a small Exempt count), the **MOOC Opted** and **Not Opted** tables, and a **Section** dropdown with the advisor beside it. No filter, no Department. Tables: `Reg No | Name | Section | Student SRM Mail | Faculty Advisor Name`. `admin_stats()` returns just the six counts.
+- **Remove student** (soft delete) and **Exempt** on Not Opted, per row and in bulk, with confirmation; `admin_remove_students`, `admin_restore_students`, `admin_set_exempt` are admin-only, work while frozen and are audited. Removal frees seats, dissolves the batch/application, deletes the student's requests, hides them everywhere, and bans the Auth login (`/api/admin/students`). The DB also refuses inactive students (`app_role()`, `_assert_role`), so a failed ban call cannot leave a usable account. **Settings** lists Removed students (Restore) and Exempt students (Undo exempt).
+- **Faculty Advisors page** (manual add with live name match, replace prompt, Edit/Remove, students-in-section count) and a third **Faculty Advisors** tab in Import (`emp_id, section`; row errors for unknown employee, unknown section, duplicates; idempotent). The mapping fills a blank Faculty Advisor Name in Batch Grouping (form and `save_batch`); typed names are kept.
+- The per-faculty Freeze and password Reset buttons moved from Overview to **Settings & Freeze**.
+- **Login:** the Admin tab is gone. The admin username on the Faculty tab signs in as admin and goes to `/admin`; the Student tab can never reach it. Same generic error for every failure; the admin account has a stricter lockout (3 failures per IP, 10 overall).
+
+### D. Designation removed
+- Gone from student/faculty UI, imports, Excel, PDF, types, schemas and RPC results; `faculty.designation` is dropped by `0010`. `cadre` stays in the DB and in the faculty import (it sets seats/batches) but is no longer displayed or exported; the faculty dashboard keeps its seat and batch cards. Faculty import columns: `emp_id, name, srm_email, phone, venue, domains, cadre`. The faculty template workbook was regenerated and an advisor template added.
+
+### Students
+- Exempt students see *"You are exempted from MOOC and Minor Project by the admin."*; MOOC and Minor are locked in the sidebar and by direct URL, and `opt_mooc`, `submit_request`, `list_faculty` and `get_faculty` refuse them.
+
+### Tests
+`tests/db/v3.test.ts` (14, real Postgres) and `tests/v3.test.ts` (16). Existing tests were updated for the removed designation and the new Excel columns.
+
+### Assumptions
+1. One section has exactly one Faculty Advisor; one advisor may own several. Sections are compared trimmed and upper-cased.
+2. "Phone number" is each student's mobile from the Application Form.
+3. "Remove" is a soft delete with restore. Their requests are deleted (not kept as Declined) so nothing about them shows in any list; restoring brings them back as Not Opted.
+4. "Exempt" applies only to students who have not opted (Not Opted table); it needs neither MOOC nor Minor and is reversible.
+5. Minor details are viewed through the Section view and the Allocations page.
+6. Cadre stays internal. The initial faculty password is the employee ID, unchanged from v2.1.
+7. The brief says "CSV"; imports in this app are Excel (.xlsx) only, so the Faculty Advisor import and template are Excel too.
+8. "Remove the filter in the preview section": the Overview has no filter at all. The status chips in the Faculty Advisor / Section view are required by B2, and the Allocations page keeps its v2 filters.
+9. A blank Faculty Advisor Name with no mapped advisor is still an error when grouping (it was prefilled with the guide's own name before, which was wrong).
+10. Allocations "mail ID" is the student's own mail (falling back to the SRM mail saved on the batch).
+
+### Not verified
+- No browser click-through: the UI is type-checked, linted and built, and the database behavior is covered by tests, but the pages were not exercised against a live Supabase project.
+- The Auth ban/unban call (service role) and the login route handler were not run against Supabase; only the helpers, schemas and DB rules are tested.
+- `0009` was applied to a fresh database after `0001`–`0008`, not to a copy of production data.
+
 ## v2.1: initial passwords
 
 - Students' initial password is their **registration number**; faculty sign in with their **SRM email** and their **employee ID** as the password. This replaces the random one-time passwords (so the credentials CSV and the one-time-password dialog are gone). Accounts still start with `must_change_password`, so the first login goes straight to the change-password screen; the throttle, CSRF and session protections are unchanged.

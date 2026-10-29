@@ -274,6 +274,9 @@ export function ApplicationClient() {
             <Field label="Guide Emp ID" htmlFor="g_emp">
               <Input id="g_emp" readOnly value={form.guide_emp_id} className={ro} />
             </Field>
+            <Field label="Department" htmlFor="g_department">
+              <Input id="g_department" readOnly value={form.guide_department} className={ro} />
+            </Field>
             <Field label="Contact Number" htmlFor="g_phone">
               <Input id="g_phone" readOnly value={form.guide_phone ?? ""} className={ro} />
             </Field>

@@ -34,11 +34,12 @@ export const getStudent = cache(async () => {
   const { supabase, user } = await requireRole("student");
   const { data: student, error } = await supabase
     .from("students")
-    .select("name, reg_no, choice")
+    .select("name, reg_no, choice, is_active")
     .eq("id", user.id)
     .single();
   if (error) throw new Error("Could not load student details. Please try again.");
-  if (!student) redirect("/login");
+  // a removed student has no portal (their login is disabled too)
+  if (!student || !student.is_active) redirect("/login");
   return { student, user };
 });
 

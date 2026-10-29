@@ -132,14 +132,10 @@ function FacultyList({
           { header: "Emp ID", cell: (r) => <span className="font-mono text-xs">{r.emp_id}</span> },
           {
             header: "Name",
-            cell: (r) => (
-              <button type="button" onClick={() => setSelected(r.id)} className="cursor-pointer font-medium text-primary underline-offset-2 hover:underline">
-                {r.name}
-              </button>
-            ),
+            cell: (r) => <span className="font-medium">{r.name}</span>,
           },
+          { header: "Request", cell: (r) => <Button aria-label={`Request ${r.name}`} onClick={() => setSelected(r.id)}>Request</Button> },
           { header: "Domain", cell: (r) => (r.domains.length ? r.domains.join(", ") : "—") },
-          { header: "Designation", cell: (r) => r.designation },
           {
             header: "Available Seats",
             cell: (r) => (
@@ -200,7 +196,7 @@ function FacultyDialog({ facultyId, onClose, onRequested }: { facultyId: string 
   return (
     <>
       <Dialog open={!!facultyId && !confirm} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent title={detail?.name ?? "Faculty details"} description={detail?.designation}>
+        <DialogContent title={detail?.name ?? "Faculty details"} >
           {!detail ? (
             <div className="space-y-2">
               <Skeleton className="h-5 w-full" />
@@ -233,7 +229,7 @@ function FacultyDialog({ facultyId, onClose, onRequested }: { facultyId: string 
                 <Button variant="outline" onClick={onClose}>
                   Close
                 </Button>
-                <Button disabled={frozen} title={frozen ? MSG.FROZEN_TIP : undefined} onClick={() => setConfirm(true)}>
+                <Button disabled={frozen || detail.available_seats <= 0} title={frozen ? MSG.FROZEN_TIP : undefined} onClick={() => setConfirm(true)}>
                   Request
                 </Button>
               </DialogFooter>
@@ -258,7 +254,6 @@ function StatusCard({ status }: { status: MinorStatus }) {
   const rows: [string, React.ReactNode][] = [
     ["Emp ID", <span key="e" className="font-mono">{status.faculty_emp_id}</span>],
     ["Name", status.faculty_name],
-    ["Designation", status.designation],
     ["Domain", status.domains.length ? status.domains.join(", ") : "—"],
     ["Available Seats", <span key="s" className="tabular-nums">{status.available_seats}/{status.total_seats}</span>],
     ["Status", <StatusBadge key="st" status={status.status} />],
@@ -284,7 +279,7 @@ function StatusCard({ status }: { status: MinorStatus }) {
             ))}
           </dl>
           <div className="rounded-lg border bg-accent/50 p-4 text-sm">
-            <p className="font-medium">{accepted ? "Your request has been accepted. Contact your guide for the next steps, then fill in the Application Form." : MSG.MEET_FACULTY}</p>
+            <p className="font-medium">{accepted ? "Your request has been accepted. Contact your guide for the next steps, fill in the Application Form once your guide completes your batch." : MSG.MEET_FACULTY}</p>
             <dl className="mt-3 space-y-1">
               <div className="flex items-center gap-2">
                 <dt className="sr-only">Phone</dt>

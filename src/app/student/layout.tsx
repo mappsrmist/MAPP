@@ -6,7 +6,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const { supabase } = await requireRole("student");
   const [frozen, accepted] = await Promise.all([
     getGlobalFrozen("student"),
-    supabase.from("requests").select("id").eq("student_id", user.id).eq("project_type", "minor").eq("status", "accepted").limit(1),
+    supabase.from("batch_members").select("batch_id").eq("student_id", user.id).eq("project_type", "minor").limit(1),
   ]);
 
   return (

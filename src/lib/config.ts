@@ -25,7 +25,7 @@ export const APPROACHED_HEADERS = ["Reg No", "Name", "Section", "Status", "Accep
 
 /** Explicit faculty columns for client queries. */
 export const FACULTY_COLS =
-  "id, emp_id, name, srm_email, designation, cadre, phone, venue, domains, total_seats, accepted_count, available_seats, frozen";
+  "id, emp_id, name, srm_email, cadre, phone, venue, domains, total_seats, accepted_count, available_seats, frozen";
 
 export const MOOC_TITLE = "Rules and Regulations for MOOC Course Selection – 21CSP303T";
 
@@ -43,6 +43,7 @@ export const MOOC_RULES: { title: string; text: string }[] = [
   { title: "Failure to Complete the Course", text: "Students who fail the course must complete it in the subsequent semester to earn the required credits." },
   { title: "Faculty Guidance", text: "Students should consult the faculty coordinator or academic advisor if they have any doubts regarding course selection or suitability." },
   { title: "Mandatory Compliance", text: "Students must follow all the prescribed guidelines. Non-compliance may require them to retake the course to earn the required credits." },
+  { title: "CGPA Eligibility", text: "Students must have a CGPA greater than 9 to opt for the MOOC course." },
 ];
 
 export const MOOC_IMPORTANT =
@@ -55,8 +56,9 @@ export const MSG = {
   MOOC_AGREE: "I agree to the rules and regulations and confirm that I am opting for the MOOC course.",
   MOOC_SUCCESS: "You have successfully opted for the MOOC course.",
   MINOR_LOCKED: "You have already opted for the MOOC course. The Minor Project dashboard is unavailable.",
+  EXEMPT: "You are exempted from MOOC and Minor Project by the admin.",
   MEET_FACULTY: "You can call / meet the faculty in person at their venue for approval.",
-  APPLICATION_LOCKED: "The Application Form opens only after your guide accepts your request.",
+  APPLICATION_LOCKED: "The Application Form opens only after your guide completes your batch.",
   FROZEN: "Allocations are frozen by the admin",
   FROZEN_HINT: "Requests, responses, batches and applications cannot be changed. You can still view and download everything.",
   FROZEN_FACULTY: "Your allocations are frozen by the admin",
