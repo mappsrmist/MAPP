@@ -26,7 +26,7 @@ const TEMPLATES: Record<Kind, { sample: string[]; note: string }> = {
   },
   advisors: {
     sample: ["EMP1001", "", "A"],
-    note: "One row per section, identified by the advisor's Emp ID or SRM Email (import faculty first). A faculty member may appear on several rows. Unknown faculty, unknown sections and sections already assigned to someone else are reported per row. Re-uploading the same mapping changes nothing.",
+    note: "One row per section, identified by the advisor's Emp ID (import faculty first; their SRM email is already on file). A faculty member may appear on several rows. Unknown faculty, unknown sections and sections already assigned to someone else are reported per row. Re-uploading the same mapping changes nothing.",
   },
 };
 

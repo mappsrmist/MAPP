@@ -90,10 +90,9 @@ export type FacultyImportRow = z.infer<typeof facultyRowSchema>;
 
 /** Faculty Advisor mapping: one row per (employee, section); an employee may appear on several rows. */
 export const advisorRowSchema = z.strictObject({
-  emp_id: optional,
-  srm_email: optional.transform((v) => v?.toLowerCase() ?? null),
+  emp_id: trimmed("emp_id"),
   section: trimmed("section", 20).transform((v) => v.toUpperCase()),
-}).refine((v) => v.emp_id || v.srm_email, { path: ["emp_id"], message: "emp_id or srm_email is required" });
+});
 export type AdvisorImportRow = z.infer<typeof advisorRowSchema>;
 
 export const importRequestSchema = z.strictObject({

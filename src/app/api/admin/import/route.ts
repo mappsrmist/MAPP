@@ -51,7 +51,7 @@ async function handlePost(request: Request) {
         const r = advisorRowSchema.safeParse(raw);
         if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
         // a section named twice in the same file with different employees is a duplicate; the second row loses
-        const who = (r.data.emp_id ?? r.data.srm_email ?? "").toLowerCase();
+        const who = r.data.emp_id.toLowerCase();
         const prior = seenSections.get(r.data.section);
         if (prior && prior !== who) throw new Error(`Duplicate section ${r.data.section} in this file (already mapped to ${prior}).`);
         seenSections.set(r.data.section, who);

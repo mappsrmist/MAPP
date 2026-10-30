@@ -51,8 +51,7 @@ export const IMPORT_FIELDS: Record<ImportKind, ImportField[]> = {
     { key: "cadre", label: "Cadre", required: true, aliases: ["cadre", "designation", "position", "role", "post", "category"], fallback: "OTHER" },
   ],
   advisors: [
-    { key: "emp_id", label: "Emp ID", required: false, aliases: [...EMP, "fa emp id", "advisor emp id", "faculty advisor emp id", "fa id"], avoid: ["student"] },
-    { key: "srm_email", label: "SRM Email", required: false, aliases: [...EMAIL, "fa email", "fa mail", "advisor email", "advisor mail", "faculty advisor email", "faculty advisor mail"], avoid: ["student", ...EMAIL_AVOID] },
+    { key: "emp_id", label: "Emp ID", required: true, aliases: [...EMP, "fa emp id", "advisor emp id", "faculty advisor emp id", "fa id"], avoid: ["student"] },
     { key: "section", label: "Section", required: true, aliases: ["section", "sec", "class", "class section", "section name"] },
   ],
 };
@@ -352,7 +351,6 @@ export function buildImportRows(sheets: ImportSheet[], layout: ImportLayout, kin
   const header = sheet.rows[layout.headerIndex]?.cells ?? [];
   const value = (key: string) => defaults[key]?.trim() || fields.find((f) => f.key === key)?.fallback || "";
   const missing = fields.filter((f) => f.required && !layout.mapping[f.key]?.length && !value(f.key)).map((f) => f.label);
-  if (kind === "advisors" && !layout.mapping.emp_id?.length && !layout.mapping.srm_email?.length) missing.unshift("Emp ID or SRM Email");
   const idKey = kind === "students" ? ["reg_no"] : kind === "faculty" ? ["emp_id", "srm_email"] : ["section"];
   const headerCanon = header.map(canon);
   const rows: Record<string, string>[] = [];

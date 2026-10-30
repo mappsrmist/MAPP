@@ -87,11 +87,10 @@ describe("Excel imports: reading", () => {
     expect(Object.keys(rows[0])).not.toContain("designation");
   });
 
-  it("maps advisors by email when there is no employee ID", async () => {
-    const rows = await parseImportWorkbook(await workbook([["Section", "Faculty Advisor Name", "Faculty Advisor Mail"], ["Section A", "Dr. Ravi", "ravi@srmist.edu.in"]]), "advisors");
-    expect(rows).toEqual([{ srm_email: "ravi@srmist.edu.in", section: "A" }]);
+  it("maps advisors by employee ID and ignores an email column", async () => {
+    const rows = await parseImportWorkbook(await workbook([["Section", "FA Emp ID", "Faculty Advisor Name", "Faculty Advisor Mail"], ["Section A", "600323", "Dr. Ravi", "ravi@srmist.edu.in"]]), "advisors");
+    expect(rows).toEqual([{ emp_id: "600323", section: "A" }]);
     expect(advisorRowSchema.safeParse(rows[0]).success).toBe(true);
-    expect(advisorRowSchema.safeParse({ section: "A" }).success).toBe(false);
   });
 
   it("lets the admin fill a missing field for every row", async () => {
