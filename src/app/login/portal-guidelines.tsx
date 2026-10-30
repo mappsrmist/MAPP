@@ -25,7 +25,7 @@ const FACULTY_STEPS: Step[] = [
   { title: "Verify and Sign Applications", body: "Students will print their completed application forms and meet you in person to obtain your signature." },
 ];
 
-export function PortalGuidelines({ role, onRoleChange }: { role: LoginRole; onRoleChange: (role: LoginRole) => void }) {
+export function PortalGuidelines({ role }: { role: LoginRole }) {
   const steps = role === "student" ? STUDENT_STEPS : FACULTY_STEPS;
   return (
     <section aria-labelledby="guidelines-heading" className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -35,14 +35,6 @@ export function PortalGuidelines({ role, onRoleChange }: { role: LoginRole; onRo
           <h2 id="guidelines-heading" className="text-xl font-semibold tracking-tight">Portal Guidelines</h2>
         </div>
         <p className="text-sm text-muted-foreground">Everything you need to know to get started with MAPP.</p>
-        <div role="group" aria-label="Guidelines for" className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
-          {(["student", "faculty"] as const).map((value) => (
-            <button key={value} type="button" aria-pressed={role === value} onClick={() => onRoleChange(value)}
-              className={cn("cursor-pointer rounded-lg px-2 py-2.5 text-sm font-medium transition-colors", role === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              {value === "student" ? "Student Guidelines" : "Faculty Guidelines"}
-            </button>
-          ))}
-        </div>
       </div>
       <div key={role} role="region" aria-label={role === "student" ? "Student guidelines" : "Faculty guidelines"} tabIndex={0} className="max-h-[36rem] overflow-y-auto overscroll-contain p-6 sm:px-8 lg:max-h-[min(36rem,calc(100dvh-22rem))] lg:min-h-80">
         <h3 className="mb-6 text-sm font-semibold">{role === "student" ? "Student Login and Project Allocation Instructions" : "Faculty Login and Student Management Instructions"}</h3>

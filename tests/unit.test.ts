@@ -9,8 +9,8 @@ import { SDG_PATTERN, applicationSubmitSchema, batchFormSchema, changePasswordSc
 
 describe("cadre -> seats / batches (e)", () => {
   it("matches the MAPP spec", () => {
-    expect([seatsForCadre("HOD"), seatsForCadre("ASSOC_CHAIR"), seatsForCadre("OTHER")]).toEqual([6, 4, 8]);
-    expect([batchesForCadre("HOD"), batchesForCadre("ASSOC_CHAIR"), batchesForCadre("OTHER")]).toEqual([3, 2, 4]);
+    expect([seatsForCadre("HOD"), seatsForCadre("ASSOC_CHAIR"), seatsForCadre("OTHER")]).toEqual([4, 4, 8]);
+    expect([batchesForCadre("HOD"), batchesForCadre("ASSOC_CHAIR"), batchesForCadre("OTHER")]).toEqual([2, 2, 4]);
   });
 });
 

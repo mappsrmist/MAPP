@@ -88,7 +88,7 @@ as described above; a nonce-based CSP would provide additional protection.
 1. Initial passwords are the registration number / employee ID (see above); the forced first-login change is the only protection until the user signs in.
 2. Opting for MOOC is final for the student; the admin can undo it ("Undo MOOC"). An active Minor request blocks MOOC.
 3. Pending requests don't reserve seats; seats are consumed on Accept.
-4. Seats follow the MAPP spec (HOD 6 / Assoc. Chair 4 / others 8).
+4. Seats follow the MAPP spec (HOD 4 / Assoc. Chair 4 / others 8).
 5. Domain filter matches any of a faculty's domains.
 6. `project_type` (`minor`|`major`) exists on `requests`, `batches`, `batch_members`; the one-active-request index is per project type.
 7. AI domain chatbot is out of scope.

@@ -73,6 +73,7 @@ async function mkFaculty(cadre: "HOD" | "ASSOC_CHAIR" | "OTHER" = "OTHER", domai
 
 let legacyStudent: string;
 let legacyFaculty: string;
+let legacyHod: string;
 beforeAll(async () => {
   server = new EmbeddedPostgres({ databaseDir: dataDir, user: "postgres", password: "pw", port: PORT, persistent: false });
   await server.initialise();
@@ -83,6 +84,7 @@ beforeAll(async () => {
   await admin.query(STUB);
   const dir = join(process.cwd(), "supabase", "migrations");
   for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+    if (f.startsWith("0013")) legacyHod = await mkFaculty("HOD");
     if (f.startsWith("0012")) {
       legacyFaculty = await mkFaculty();
       legacyStudent = await mkStudent("LEGACY");
@@ -195,5 +197,14 @@ describe('MOOC Faculty Advisor approval',()=>{
     const t=await team();await apply(t.student);
     const count=await as(t.faculty,async q=>(await q('select public.fa_class_counts($1) as c',[t.section])).rows[0].c);
     expect(count).toMatchObject({mooc:0,mooc_pending:1,not_opted:0});
+  });
+});
+
+describe('HOD cadre',()=>{
+  it('gives HOD 4 seats / 2 batches, including HODs created before migration 0013',async()=>{
+    const hod=await mkFaculty('HOD');
+    const rows=(await admin.query('select id,total_seats from public.faculty where id=any($1)',[[hod,legacyHod]])).rows;
+    expect(rows.map(r=>r.total_seats)).toEqual([4,4]);
+    expect((await admin.query("select public.cadre_batches('HOD') b")).rows[0].b).toBe(2);
   });
 });

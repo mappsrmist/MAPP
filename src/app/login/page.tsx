@@ -21,7 +21,6 @@ const TABS: { role: Tab; label: string; icon: React.ReactNode; userLabel: string
 export default function LoginPage() {
   const router = useRouter();
   const [role, setRole] = React.useState<Tab>("student");
-  const [guidelinesRole, setGuidelinesRole] = React.useState<LoginRole>("student");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -71,7 +70,6 @@ export default function LoginPage() {
                 aria-pressed={role === t.role}
                 onClick={() => {
                   setRole(t.role);
-                  setGuidelinesRole(t.role);
                   setError(null);
                   setUsername("");
                   setPassword("");
@@ -128,7 +126,7 @@ export default function LoginPage() {
             </Button>
           </form>
         </Card>
-          <PortalGuidelines role={guidelinesRole} onRoleChange={setGuidelinesRole} />
+          <PortalGuidelines role={role} />
         </div>
         <footer className="mt-8 border-t pt-5 text-center text-xs text-muted-foreground">Department of Computing Technologies · SRMIST</footer>
       </div>

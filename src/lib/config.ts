@@ -16,7 +16,7 @@ export const CADRE_LABEL: Record<Cadre, string> = {
 };
 
 /** Mirrors public.cadre_seats() in the database (the DB is the source of truth). */
-export const CADRE_SEATS: Record<Cadre, number> = { HOD: 6, ASSOC_CHAIR: 4, OTHER: 8 };
+export const CADRE_SEATS: Record<Cadre, number> = { HOD: 4, ASSOC_CHAIR: 4, OTHER: 8 };
 export const seatsForCadre = (c: Cadre) => CADRE_SEATS[c];
 export const batchesForCadre = (c: Cadre) => CADRE_SEATS[c] / 2;
 
