@@ -2,31 +2,38 @@
 
 import * as React from "react";
 import { exportTable } from "@/lib/excel";
-import { IMPORT_HEADERS, parseImportWorkbook, validateImportFile } from "@/lib/import-excel";
-import { CheckCircle2, Download, FileSpreadsheet, Upload } from "lucide-react";
+import {
+  IMPORT_FIELDS, IMPORT_HEADERS, MAX_IMPORT_ROWS, buildImportRows, detectLayout, readImportWorkbook, validateImportFile,
+  type ImportLayout, type ImportSheet,
+} from "@/lib/import-excel";
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from "@/components/ui/card";
+import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from "@/components/ui/card";
+import { Input, Select } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
 type Kind = "students" | "faculty" | "advisors";
 
-const TEMPLATES: Record<Kind, { header: string[]; sample: string[]; note: string }> = {
+const TEMPLATES: Record<Kind, { sample: string[]; note: string }> = {
   students: {
-    header: IMPORT_HEADERS.students,
     sample: ["RA2411003010058", "Aarav Kumar", "CSE", "A", ""],
-    note: "section is required (it appears on the Approached list and the Excel sheets); email is optional. New students sign in with their registration number as the password and must change it at first login.",
+    note: "Reg No, Name and Section are needed; Dept and Email are optional (Dept defaults to the value you set below). New students sign in with their registration number as the password and must change it at first login.",
   },
   faculty: {
-    header: IMPORT_HEADERS.faculty,
-    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI;Machine Learning", "OTHER", "Assistant Professor"],
-    note: "designation: optional academic title, shown on application forms. cadre: HOD, ASSOC_CHAIR or OTHER (it sets the seat and batch counts and is never shown). domains: separate with semicolons. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
+    sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI; Machine Learning", "OTHER"],
+    note: "Emp ID, Name and SRM Email are needed. Cadre (HOD, Associate Chair or other) sets the seat and batch counts; it is read from a Cadre or Designation column (\"Professor & Head\" counts as HOD) and is OTHER when absent. Domains may be split by semicolons, commas or new lines, or spread over several columns. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
   },
   advisors: {
-    header: IMPORT_HEADERS.advisors,
-    sample: ["EMP1001", "A"],
-    note: "One row per section; a faculty member may appear on several rows. Unknown employee IDs, unknown sections and sections already assigned to someone else are reported per row. Re-uploading the same mapping changes nothing.",
+    sample: ["EMP1001", "", "A"],
+    note: "One row per section, identified by the advisor's Emp ID or SRM Email (import faculty first). A faculty member may appear on several rows. Unknown faculty, unknown sections and sections already assigned to someone else are reported per row. Re-uploading the same mapping changes nothing.",
   },
+};
+
+const colName = (i: number) => {
+  let s = "";
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
 };
 
 const CHUNK = 50;
@@ -38,7 +45,9 @@ interface RowError {
 
 export function ImportClient({ initialKind = "students" }: { initialKind?: Kind }) {
   const [kind, setKind] = React.useState<Kind>(initialKind);
-  const [rows, setRows] = React.useState<Record<string, string>[] | null>(null);
+  const [sheets, setSheets] = React.useState<ImportSheet[] | null>(null);
+  const [layout, setLayout] = React.useState<ImportLayout | null>(null);
+  const [defaults, setDefaults] = React.useState<Record<string, string>>({});
   const [fileName, setFileName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [reading, setReading] = React.useState(false);
@@ -47,11 +56,18 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
   const [result, setResult] = React.useState<{ created: number; updated: number; errors: RowError[] } | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
+  const fields = IMPORT_FIELDS[kind];
+  const built = React.useMemo(() => (sheets && layout ? buildImportRows(sheets, layout, kind, defaults) : null), [sheets, layout, kind, defaults]);
+  const rows = built?.rows ?? null;
+  const tooMany = (rows?.length ?? 0) > MAX_IMPORT_ROWS;
+
   function reset(next?: Kind) {
     fileVersion.current++;
     setReading(false);
     if (next) setKind(next);
-    setRows(null);
+    setSheets(null);
+    setLayout(null);
+    setDefaults({});
     setFileName("");
     setResult(null);
     setProgress(0);
@@ -60,25 +76,29 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
 
   async function downloadTemplate() {
     const t = TEMPLATES[kind];
+    const header = IMPORT_HEADERS[kind];
     try {
-      await exportTable(`mapp_${kind}_template.xlsx`, kind, t.header.map((h) => ({ header: h, key: h, width: 24 })),
-        [Object.fromEntries(t.header.map((h, i) => [h, t.sample[i]]))]);
+      await exportTable(`mapp_${kind}_template.xlsx`, kind, header.map((h) => ({ header: h, key: h, width: 24 })),
+        [Object.fromEntries(header.map((h, i) => [h, t.sample[i]]))]);
     } catch { toast.error("Could not create the Excel template. Please try again."); }
   }
 
   async function onFile(file: File | undefined) {
     const version = ++fileVersion.current;
-    setRows(null);
+    setSheets(null);
+    setLayout(null);
     setFileName("");
     setResult(null);
     if (!file) return;
     setReading(true);
     try {
       validateImportFile(file);
-      const data = await parseImportWorkbook(new Uint8Array(await file.arrayBuffer()), kind);
+      const book = await readImportWorkbook(new Uint8Array(await file.arrayBuffer()));
+      const found = detectLayout(book, kind);
       if (fileVersion.current !== version) return;
       setFileName(file.name);
-      setRows(data);
+      setSheets(book);
+      setLayout(found);
     } catch (e) {
       if (fileVersion.current === version) toast.error(e instanceof Error ? e.message : "Could not read the Excel workbook.");
     } finally {
@@ -86,8 +106,25 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
     }
   }
 
+  function chooseSheet(index: number) {
+    if (!sheets) return;
+    try {
+      setLayout(detectLayout(sheets, kind, index));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No matching columns on that sheet.");
+    }
+  }
+
+  function chooseColumn(key: string, col: string) {
+    if (!layout) return;
+    // a column feeds one field: picking it here releases it elsewhere
+    const mapping = Object.fromEntries(Object.entries(layout.mapping).map(([k, cols]) => [k, cols.filter((c) => String(c) !== col)]));
+    mapping[key] = col === "" ? [] : [Number(col)];
+    setLayout({ ...layout, mapping });
+  }
+
   async function runImport() {
-    if (!rows) return;
+    if (!built || !rows) return;
     setBusy(true);
     setProgress(0);
     const totals = { created: 0, updated: 0, errors: [] as RowError[] };
@@ -96,7 +133,7 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
         const res = await fetch("/api/admin/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: kind, offset: i, rows: rows.slice(i, i + CHUNK) }),
+          body: JSON.stringify({ type: kind, offset: i, rows: rows.slice(i, i + CHUNK), rowNumbers: built.rowNumbers.slice(i, i + CHUNK) }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error ?? `Import failed (${res.status})`);
@@ -143,8 +180,10 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
           <CardDescription>{t.note}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="overflow-x-auto rounded-lg bg-muted px-3 py-2 font-mono text-xs">{t.header.join(", ")}</p>
-          <p className="text-sm text-muted-foreground">Use one worksheet with headers in the first row. Maximum 2 MiB and 5,000 data rows. Keep IDs and phone numbers as text. Formulas, macros and embedded objects are not accepted.</p>
+          <p className="text-sm text-muted-foreground">
+            Upload the sheet as you have it: title rows, extra columns, formulas, links and merged cells are fine. Columns are matched by their titles
+            (for example {IMPORT_HEADERS[kind].join(", ")}), and you can correct the match before importing. Maximum 5 MiB and 5,000 rows.
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={downloadTemplate}>
               <Download className="h-4 w-4" /> Download template
@@ -157,10 +196,92 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
             {fileName && (
               <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                 <FileSpreadsheet className="h-4 w-4" /> {fileName}
-                {rows && <> · {rows.length} row(s)</>}
+                {rows && <> · {rows.length} row(s) ready</>}
               </span>
             )}
           </div>
+
+          {sheets && layout && built && (
+            <div className="space-y-4 rounded-xl border p-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <span className="font-semibold">Column matching</span>
+                {sheets.filter((sh) => sh.rows.length).length > 1 ? (
+                  <label className="inline-flex items-center gap-2">
+                    Sheet
+                    <Select className="h-9 w-auto" value={layout.sheetIndex} disabled={busy} onChange={(e) => chooseSheet(Number(e.target.value))}>
+                      {sheets.map((sh, i) => (sh.rows.length ? <option key={i} value={i}>{sh.name}</option> : null))}
+                    </Select>
+                  </label>
+                ) : (
+                  <span className="text-muted-foreground">Sheet “{sheets[layout.sheetIndex].name}”</span>
+                )}
+                <span className="text-muted-foreground">Titles found on row {sheets[layout.sheetIndex].rows[layout.headerIndex].n}</span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[36rem] text-sm">
+                  <thead className="text-left text-xs uppercase text-muted-foreground">
+                    <tr><th className="py-1.5 pr-3">MAPP field</th><th className="py-1.5 pr-3">Column in your file</th><th className="py-1.5">First value</th></tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {fields.map((f) => {
+                      const header = sheets[layout.sheetIndex].rows[layout.headerIndex].cells;
+                      const cols = layout.mapping[f.key] ?? [];
+                      const needsValue = !cols.length && f.fallback !== undefined;
+                      return (
+                        <tr key={f.key}>
+                          <td className="py-2 pr-3 font-medium">
+                            {f.label} {f.required && f.fallback === undefined && <span className="text-destructive" aria-label="required">*</span>}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Select className="h-9 w-56" aria-label={`Column for ${f.label}`} value={cols.length ? String(cols[0]) : ""} disabled={busy} onChange={(e) => chooseColumn(f.key, e.target.value)}>
+                                <option value="">— Not in file —</option>
+                                {header.map((h, i) => <option key={i} value={i}>{colName(i)}: {h || "(no title)"}</option>)}
+                              </Select>
+                              {cols.length > 1 && <Badge>+ {cols.slice(1).map((c) => header[c] || colName(c)).join(", ")}</Badge>}
+                              {needsValue && (
+                                <Input className="h-9 w-40" aria-label={`${f.label} for every row`} placeholder={f.fallback} value={defaults[f.key] ?? ""} disabled={busy}
+                                  onChange={(e) => setDefaults((d) => ({ ...d, [f.key]: e.target.value }))} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="max-w-56 truncate py-2 text-muted-foreground">{rows?.[0]?.[f.key] ?? ""}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {fields.some((f) => f.fallback !== undefined) && (
+                <p className="text-xs text-muted-foreground">When a field is not in the file, the value in its box is used for every row ({fields.filter((f) => f.fallback !== undefined).map((f) => `${f.label}: ${f.fallback}`).join(", ")} if left empty).</p>
+              )}
+              {built.missing.length > 0 && (
+                <p role="alert" className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" /> Choose a column for: {built.missing.join(", ")}
+                </p>
+              )}
+              {tooMany && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">Import at most 5,000 rows at a time.</p>}
+              {rows && rows.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/60 text-left uppercase text-muted-foreground">
+                      <tr><th className="px-2 py-1.5">Row</th>{fields.map((f) => <th key={f.key} className="px-2 py-1.5">{f.label}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {rows.slice(0, 5).map((r, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-1.5 tabular-nums text-muted-foreground">{built.rowNumbers[i]}</td>
+                          {fields.map((f) => <td key={f.key} className="max-w-48 truncate px-2 py-1.5">{r[f.key] ?? ""}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {rows.length > 5 && <p className="border-t px-2 py-1.5 text-xs text-muted-foreground">…and {rows.length - 5} more row(s)</p>}
+                </div>
+              )}
+            </div>
+          )}
 
           {busy && (
             <div role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="h-2 overflow-hidden rounded-full bg-muted">
@@ -168,7 +289,7 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
             </div>
           )}
 
-          <Button disabled={reading || !rows || rows.length === 0} loading={busy || reading} onClick={runImport}>
+          <Button disabled={reading || !rows || rows.length === 0 || !!built?.missing.length || tooMany} loading={busy || reading} onClick={runImport}>
             Import {rows ? rows.length : ""} {kind === "advisors" ? "mapping(s)" : kind}
           </Button>
         </CardContent>

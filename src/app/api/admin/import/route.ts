@@ -10,7 +10,7 @@ import { enforceRateLimit } from "@/lib/server/rate-limit";
 export const maxDuration = 60;
 
 interface RowError {
-  row: number; // Excel row number (row 1 contains headers)
+  row: number; // Excel row number in the uploaded sheet
   message: string;
 }
 
@@ -27,7 +27,7 @@ async function handlePost(request: Request) {
 
   const body = importRequestSchema.safeParse(await readJsonBody(request));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0].message }, { status: 400 });
-  const { type, rows, offset } = body.data;
+  const { type, rows, offset, rowNumbers } = body.data;
 
   const admin = createAdminClient();
   const errors: RowError[] = [];
@@ -41,7 +41,7 @@ async function handlePost(request: Request) {
   };
 
   const work = rows.map((raw, i) => async () => {
-    const rowNo = offset + i + 2;
+    const rowNo = rowNumbers?.[i] ?? offset + i + 2;
     try {
       if (type === "students") {
         const r = studentRowSchema.safeParse(raw);
@@ -51,9 +51,10 @@ async function handlePost(request: Request) {
         const r = advisorRowSchema.safeParse(raw);
         if (!r.success) throw new Error(r.error.issues.map((x) => `${x.path.join(".")}: ${x.message}`).join("; "));
         // a section named twice in the same file with different employees is a duplicate; the second row loses
+        const who = (r.data.emp_id ?? r.data.srm_email ?? "").toLowerCase();
         const prior = seenSections.get(r.data.section);
-        if (prior && prior !== r.data.emp_id.toLowerCase()) throw new Error(`Duplicate section ${r.data.section} in this file (already mapped to ${prior}).`);
-        seenSections.set(r.data.section, r.data.emp_id.toLowerCase());
+        if (prior && prior !== who) throw new Error(`Duplicate section ${r.data.section} in this file (already mapped to ${prior}).`);
+        seenSections.set(r.data.section, who);
         record(await upsertAdvisor(admin, r.data));
       } else {
         const r = facultyRowSchema.safeParse(raw);

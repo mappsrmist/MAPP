@@ -43,17 +43,25 @@ export const studentRowSchema = z.strictObject({
     .refine((v) => /^[A-Z0-9]{6,30}$/.test(v), "reg_no must be 6-30 letters/digits with no spaces"),
   name: trimmed("name"),
   dept: trimmed("dept", 100),
-  section: trimmed("section", 20),
+  section: trimmed("section", 20).transform((v) => v.toUpperCase()),
   email: optional.refine((v) => v === null || z.email().safeParse(v).success, "email is not valid"),
 });
 export type StudentRow = z.infer<typeof studentRowSchema>;
 
-const cadreSchema = z
-  .string({ error: "cadre is required" })
-  .trim()
-  .transform((v) => v.toUpperCase().replace(/[\s-]+/g, "_"))
-  .transform((v) => (v === "ASSOCIATE_CHAIR" || v === "ASSOC_CHAIR" ? "ASSOC_CHAIR" : v))
-  .refine((v): v is Cadre => (CADRES as readonly string[]).includes(v), "cadre must be HOD, ASSOC_CHAIR or OTHER");
+/**
+ * Cadre from a cadre or designation cell: "HOD", "Professor & Head", "Head of the Department" → HOD;
+ * "Associate Chair(person)", "Professor & Asso Chairperson" → ASSOC_CHAIR; anything else, including blank and
+ * "Associate Professor", → OTHER.
+ */
+export function normalizeCadre(value: string): Cadre {
+  const v = value.trim().toUpperCase();
+  if ((CADRES as readonly string[]).includes(v)) return v as Cadre;
+  if (/\bASSO(?:C(?:IATE)?)?\.?[\s_-]*CHAIR/.test(v)) return "ASSOC_CHAIR";
+  if (/\bH\.?\s?O\.?\s?D\b|\bHEAD\b/.test(v)) return "HOD";
+  return "OTHER";
+}
+
+const cadreSchema = z.string().max(200).optional().transform((v) => normalizeCadre(v ?? ""));
 
 export const facultyRowSchema = z.strictObject({
   // the employee ID is the initial password, so it must meet the minimum password length
@@ -64,7 +72,6 @@ export const facultyRowSchema = z.strictObject({
     .transform((v) => v.toLowerCase())
     .refine((v) => !v.endsWith("mapp.local"), "srm_email uses a reserved domain"),
   cadre: cadreSchema,
-  designation: optional,
   phone: optional,
   venue: optional,
   domains: z
@@ -74,27 +81,30 @@ export const facultyRowSchema = z.strictObject({
     .transform((v) =>
       (v ?? "")
         .split(";")
-        .map((d) => d.trim().slice(0, 80))
+        .map((d) => d.trim().slice(0, 150))
         .filter(Boolean)
-        .slice(0, 10),
+        .slice(0, 15),
     ),
 });
 export type FacultyImportRow = z.infer<typeof facultyRowSchema>;
 
 /** Faculty Advisor mapping: one row per (employee, section); an employee may appear on several rows. */
 export const advisorRowSchema = z.strictObject({
-  emp_id: trimmed("emp_id", 40),
+  emp_id: optional,
+  srm_email: optional.transform((v) => v?.toLowerCase() ?? null),
   section: trimmed("section", 20).transform((v) => v.toUpperCase()),
-});
+}).refine((v) => v.emp_id || v.srm_email, { path: ["emp_id"], message: "emp_id or srm_email is required" });
 export type AdvisorImportRow = z.infer<typeof advisorRowSchema>;
 
 export const importRequestSchema = z.strictObject({
   type: z.enum(["students", "faculty", "advisors"]),
   offset: z.number().int().min(0).max(4999).default(0),
   rows: z.array(z.record(
-    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains", "designation"].includes(key)),
+    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains"].includes(key)),
     z.string().max(500).regex(/^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/),
   )).min(1).max(100),
+  /** Excel row number of each row, for the error report */
+  rowNumbers: z.array(z.number().int().min(1).max(1_048_576)).max(100).optional(),
 }).refine((v) => v.offset + v.rows.length <= 5000, "Import at most 5,000 rows.");
 
 export const resetPasswordSchema = z.strictObject({ profileId: z.uuid() });

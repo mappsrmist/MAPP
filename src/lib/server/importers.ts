@@ -80,7 +80,6 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
       name: row.name,
       srm_email: row.srm_email,
       cadre: row.cadre,
-      ...(row.designation !== null ? { designation: row.designation } : {}),
       phone: row.phone,
       venue: row.venue,
       domains: row.domains,
@@ -99,7 +98,13 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
  * belongs to a different advisor is rejected here (the admin replaces it deliberately on the Faculty Advisors page).
  */
 export async function upsertAdvisor(admin: Admin, row: AdvisorImportRow): Promise<Upserted & { unchanged: boolean }> {
-  const { data, error } = await admin.rpc("_set_fa", { p_emp_id: row.emp_id, p_section: row.section, p_replace: false });
+  let empId = row.emp_id;
+  if (!empId) {
+    const { data: f } = await admin.from("faculty").select("emp_id").eq("srm_email", row.srm_email).maybeSingle();
+    if (!f) throw new Error(`No faculty member with SRM email ${row.srm_email}.`);
+    empId = f.emp_id as string;
+  }
+  const { data, error } = await admin.rpc("_set_fa", { p_emp_id: empId, p_section: row.section, p_replace: false });
   if (error) {
     // the database messages are written for the admin ("Unknown employee ID.", "Section X is already assigned to Y.")
     throw new Error(error.message);

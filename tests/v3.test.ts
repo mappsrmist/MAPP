@@ -49,16 +49,17 @@ describe("admin sign-in goes through the Faculty tab", () => {
 });
 
 describe("imports", () => {
-  it("faculty template supports optional designation and retains cadre", () => {
-    expect(IMPORT_HEADERS.faculty).toEqual(["emp_id", "name", "srm_email", "phone", "venue", "domains", "cadre", "designation"]);
-    expect(IMPORT_HEADERS.advisors).toEqual(["emp_id", "section"]);
+  it("faculty import has no designation and keeps cadre", () => {
+    expect(IMPORT_HEADERS.faculty).toEqual(["Emp ID", "Name", "SRM Email", "Phone", "Venue", "Domains", "Cadre"]);
+    expect(IMPORT_HEADERS.advisors).toEqual(["Emp ID", "SRM Email", "Section"]);
     const row = { emp_id: "600323", name: "X", srm_email: "x@srmist.edu.in", cadre: "OTHER" };
     expect(facultyRowSchema.safeParse(row).success).toBe(true);
-    expect(facultyRowSchema.safeParse({ ...row, designation: "Prof" }).success).toBe(true);
-    expect(importRequestSchema.safeParse({ type: "faculty", rows: [{ ...row, designation: "P" }] }).success).toBe(true);
+    expect(facultyRowSchema.safeParse({ ...row, designation: "Prof" }).success).toBe(false);
+    expect(importRequestSchema.safeParse({ type: "faculty", rows: [{ ...row, designation: "P" }] }).success).toBe(false);
+    expect(importRequestSchema.safeParse({ type: "faculty", rows: [row], rowNumbers: [7] }).success).toBe(true);
   });
   it("validates advisor rows and normalises the section", () => {
-    expect(advisorRowSchema.parse({ emp_id: " 600323 ", section: " a2 " })).toEqual({ emp_id: "600323", section: "A2" });
+    expect(advisorRowSchema.parse({ emp_id: " 600323 ", section: " a2 " })).toEqual({ emp_id: "600323", srm_email: null, section: "A2" });
     expect(advisorRowSchema.safeParse({ emp_id: "600323" }).success).toBe(false);
     expect(advisorRowSchema.safeParse({ emp_id: "600323", section: "A", role: "admin" }).success).toBe(false);
     expect(importRequestSchema.safeParse({ type: "advisors", rows: [{ emp_id: "600323", section: "A" }] }).success).toBe(true);
