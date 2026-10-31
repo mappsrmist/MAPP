@@ -115,7 +115,7 @@ async function team() {
   const section = 'M' + (++n);
   const faculty = await mkFaculty();
   const student = await mkStudent(section);
-  await admin.query('insert into public.faculty_advisors(section,faculty_id) values ($1,$2)', [section,faculty]);
+  await admin.query('update public.students set fa_id=$1 where id=$2', [faculty,student]);
   return { section, faculty, student };
 }
 const apply = (student: string, cgpa: unknown = 9) => as(student, q => q('select public.opt_mooc($1::numeric)', [cgpa]));
@@ -133,10 +133,10 @@ describe('MOOC Faculty Advisor approval',()=>{
     await decide(legacyFaculty,row.request_id,'approved');
     expect(await choice(legacyStudent)).toBe('mooc');
   });
-  it('uses the current assigned advisor after a section is reassigned',async()=>{
+  it('uses the current assigned advisor after a student is reassigned',async()=>{
     const t=await team();await apply(t.student);const [row]=await queue(t.faculty,t.section);
     const replacement=await mkFaculty();
-    await admin.query('update public.faculty_advisors set faculty_id=$1 where section=$2',[replacement,t.section]);
+    await admin.query('update public.students set fa_id=$1 where id=$2',[replacement,t.student]);
     await expect(decide(t.faculty,row.request_id,'approved')).rejects.toThrow(/Advisor/);
     await decide(replacement,row.request_id,'approved');expect(await choice(t.student)).toBe('mooc');
   });
@@ -159,7 +159,7 @@ describe('MOOC Faculty Advisor approval',()=>{
     for(const cgpa of [null,0,8.99,10.01,'NaN','Infinity','-Infinity']) await expect(apply(t.student,cgpa)).rejects.toThrow(/CGPA/);
     await apply(t.student,10); expect(await choice(t.student)).toBe('mooc_pending');
   });
-  it('blocks cross-section reads, approvals by unrelated faculty, student self-approval and direct writes',async()=>{
+  it('blocks reads and approvals by faculty who are not the advisor, student self-approval and direct writes',async()=>{
     const t=await team(); const other=await mkFaculty(); await apply(t.student);
     const [row]=await queue(t.faculty,t.section);
     await expect(queue(other,t.section)).rejects.toThrow(/Advisor/);
@@ -197,6 +197,34 @@ describe('MOOC Faculty Advisor approval',()=>{
     const t=await team();await apply(t.student);
     const count=await as(t.faculty,async q=>(await q('select public.fa_class_counts($1) as c',[t.section])).rows[0].c);
     expect(count).toMatchObject({mooc:0,mooc_pending:1,not_opted:0});
+  });
+});
+
+describe('per-student Faculty Advisor',()=>{
+  it('migrated the old section mapping onto the students',async()=>{
+    const fa=(await admin.query('select fa_id from public.students where id=$1',[legacyStudent])).rows[0].fa_id;
+    expect(fa).toBe(legacyFaculty);
+    expect((await admin.query("select to_regclass('public.faculty_advisors') t")).rows[0].t).toBeNull();
+  });
+  it('gives each advisor only their own students, across sections and within a shared section',async()=>{
+    const a=await mkFaculty(), b=await mkFaculty();
+    const tag=++n, P='P'+tag, Q='Q'+tag;
+    const a1=await mkStudent(P), a2=await mkStudent(Q), b1=await mkStudent(P);
+    await admin.query('update public.students set fa_id=$1 where id=any($2)',[a,[a1,a2]]);
+    await admin.query('update public.students set fa_id=$1 where id=$2',[b,b1]);
+    const rows=(who:string,section:string|null)=>as(who,async q=>(await q('select student_id from public.fa_class_overview($1,null,null,1)',[section])).rows.map(r=>r.student_id).sort());
+    expect(await rows(a,null)).toEqual([a1,a2].sort());
+    expect(await rows(a,P)).toEqual([a1]);
+    expect(await rows(b,null)).toEqual([b1]);
+    const c=await as(a,async q=>(await q('select public.fa_class_counts(null) c')).rows[0].c);
+    expect(c).toMatchObject({total:2,fa_name:expect.any(String)});
+    expect((await as(a,async q=>(await q('select * from public.my_fa_sections()')).rows)).map(r=>r.my_fa_sections).sort()).toEqual([P,Q].sort());
+  });
+  it('is hidden from faculty with no advisees and the section tables are gone',async()=>{
+    const plain=await mkFaculty();
+    expect((await as(plain,async q=>(await q('select public.is_faculty_advisor() v')).rows[0].v))).toBe(false);
+    await expect(as(plain,q=>q('select * from public.fa_class_overview(null,null,null,1)'))).rejects.toThrow(/Advisor/);
+    await expect(as(plain,q=>q("select public.admin_set_fa('x','y')"))).rejects.toThrow(/does not exist/);
   });
 });
 

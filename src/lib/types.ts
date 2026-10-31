@@ -58,14 +58,6 @@ export interface SectionRow {
   fa_name: string | null;
 }
 
-export interface AdvisorRow {
-  section: string;
-  fa_emp_id: string;
-  fa_name: string;
-  student_count: number;
-  total_count: number;
-}
-
 export interface FacultyListRow {
   id: string;
   emp_id: string;

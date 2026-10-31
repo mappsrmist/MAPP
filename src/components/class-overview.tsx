@@ -31,10 +31,11 @@ const CHIPS: { key: ClassStatus | null; label: string; count: "total" | ClassSta
 ];
 
 /**
- * Read-only class list for one section. Used by the Faculty Advisor page and, identically, by the admin Section
- * view. The RPCs verify that the caller is the section's advisor (or the admin), so this component trusts nothing.
+ * Read-only student list. Used by the Faculty Advisor page (the caller's own advisees, optionally narrowed to one
+ * section) and by the admin Section view (everyone in the section). The RPCs scope the rows to the caller's
+ * advisees (or the admin), so this component trusts nothing.
  */
-export function ClassOverview({ section, refreshKey = 0 }: { section: string; refreshKey?: number }) {
+export function ClassOverview({ section = "", refreshKey = 0 }: { section?: string; refreshKey?: number }) {
   const supabase = React.useMemo(() => createClient(), []);
   const [loaded, setLoaded] = React.useState<{ section: string; counts: ClassCounts } | null>(null);
   const [status, setStatus] = React.useState<ClassStatus | null>(null);
@@ -42,7 +43,7 @@ export function ClassOverview({ section, refreshKey = 0 }: { section: string; re
 
   React.useEffect(() => {
     let live = true;
-    void supabase.rpc("fa_class_counts", { p_section: section }).then(({ data, error }) => {
+    void supabase.rpc("fa_class_counts", { p_section: section || null }).then(({ data, error }) => {
       if (!live) return;
       if (error) toast.error(error.message);
       else setLoaded({ section, counts: data as ClassCounts });
@@ -53,12 +54,12 @@ export function ClassOverview({ section, refreshKey = 0 }: { section: string; re
   }, [supabase, section, refreshKey]);
 
   async function download() {
-    const { data, error } = await supabase.rpc("fa_class_overview", { p_section: section, p_search: null, p_status: status, p_page: 0 });
+    const { data, error } = await supabase.rpc("fa_class_overview", { p_section: section || null, p_search: null, p_status: status, p_page: 0 });
     if (error) return void toast.error(error.message);
     const rows = (data ?? []) as ClassRow[];
     await exportTable(
-      `MAPP_Class_${safeFilePart(section)}.xlsx`,
-      `Section ${section}`,
+      `MAPP_Class_${safeFilePart(section || "My_students")}.xlsx`,
+      section ? `Section ${section}` : "My students",
       [
         { header: "Reg No", key: "reg", width: 22 },
         { header: "Name", key: "name", width: 30 },
@@ -121,7 +122,7 @@ export function ClassOverview({ section, refreshKey = 0 }: { section: string; re
         emptyTitle="No students match"
         onError={(m) => toast.error(m)}
         fetchPage={async (page, search) => {
-          const { data, error } = await supabase.rpc("fa_class_overview", { p_section: section, p_search: search || null, p_status: status, p_page: page });
+          const { data, error } = await supabase.rpc("fa_class_overview", { p_section: section || null, p_search: search || null, p_status: status, p_page: page });
           if (error) throw new Error(error.message);
           const rows = (data ?? []) as ClassRow[];
           return { rows, total: Number(rows[0]?.total_count ?? 0) };

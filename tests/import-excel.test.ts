@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import {
   buildImportRows, canon, detectLayout, parseImportWorkbook, readImportWorkbook, validateImportFile, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS,
 } from "@/lib/import-excel";
-import { advisorRowSchema, facultyRowSchema, normalizeCadre, studentRowSchema } from "@/lib/validators";
+import { facultyRowSchema, normalizeCadre, studentRowSchema } from "@/lib/validators";
 
 async function bytesOf(wb: ExcelJS.Workbook) {
   return new Uint8Array(await wb.xlsx.writeBuffer());
@@ -87,10 +87,13 @@ describe("Excel imports: reading", () => {
     expect(Object.keys(rows[0])).not.toContain("designation");
   });
 
-  it("maps advisors by employee ID and ignores an email column", async () => {
-    const rows = await parseImportWorkbook(await workbook([["Section", "FA Emp ID", "Faculty Advisor Name", "Faculty Advisor Mail"], ["Section A", "600323", "Dr. Ravi", "ravi@srmist.edu.in"]]), "advisors");
-    expect(rows).toEqual([{ emp_id: "600323", section: "A" }]);
-    expect(advisorRowSchema.safeParse(rows[0]).success).toBe(true);
+  it("reads the Faculty Advisor email column of a student sheet", async () => {
+    const rows = await parseImportWorkbook(
+      await workbook([["Reg No", "Name", "Section", "Email", "Faculty Advisor Name", "Faculty Advisor Mail"], ["RA2400000000001", "A", "Section A", "a@srmist.edu.in", "Dr. Ravi", "Ravi@srmist.edu.in"]]),
+      "students",
+    );
+    expect(rows).toEqual([{ reg_no: "RA2400000000001", name: "A", dept: "CSE", section: "A", email: "a@srmist.edu.in", fa_email: "ravi@srmist.edu.in" }]);
+    expect(studentRowSchema.safeParse(rows[0]).success).toBe(true);
   });
 
   it("lets the admin fill a missing field for every row", async () => {

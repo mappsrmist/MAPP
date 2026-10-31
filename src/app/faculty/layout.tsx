@@ -18,7 +18,7 @@ export default async function FacultyLayout({ children }: { children: React.Reac
   const nav: NavItem[] = [
     { href: "/faculty/approached", label: "Students Approached", icon: <UsersRound className="h-4 w-4" /> },
     { href: "/faculty/batches", label: "Batch Grouping", icon: <Layers className="h-4 w-4" /> },
-    // only faculty mapped to at least one section ever see this item
+    // only faculty with at least one assigned student ever see this item
     ...(isAdvisor ? [{ href: "/faculty/advisor", label: "Faculty Advisor", icon: <GraduationCap className="h-4 w-4" /> }] : []),
   ];
 

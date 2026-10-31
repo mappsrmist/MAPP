@@ -12,7 +12,7 @@ const MAX_SHEET_ROWS = 20000;
 const MAX_COLUMNS = 100;
 const HEADER_SCAN_ROWS = 30;
 
-export type ImportKind = "students" | "faculty" | "advisors";
+export type ImportKind = "students" | "faculty";
 
 export interface ImportField {
   key: string;
@@ -32,6 +32,8 @@ const STUDENT_AVOID = ["advisor", "fa", "guide", "faculty", "father", "mother", 
 const EMAIL = ["email", "email id", "mail", "mail id", "srm email", "srm mail", "official email", "official mail", "srmist email", "srmist mail", "college email", "institute email"];
 const EMAIL_AVOID = ["personal", "alternate", "alt", "parent", "father", "mother", "gmail"];
 const EMP = ["emp id", "emp no", "emp code", "staff id", "staff no", "staff code", "faculty id", "faculty code", "id no", "id"];
+const FA_EMAIL = ["fa email", "fa email id", "fa mail", "fa mail id", "fa srm email", "advisor email", "advisor email id", "advisor mail", "advisor mail id",
+  "faculty advisor email", "faculty advisor email id", "faculty advisor mail", "faculty advisor mail id", "faculty advisor srm email", "faculty advisor srm mail"];
 
 export const IMPORT_FIELDS: Record<ImportKind, ImportField[]> = {
   students: [
@@ -40,6 +42,7 @@ export const IMPORT_FIELDS: Record<ImportKind, ImportField[]> = {
     { key: "dept", label: "Dept", required: true, aliases: ["dept", "department", "branch", "programme", "program", "course", "discipline", "degree"], avoid: STUDENT_AVOID, fallback: "CSE" },
     { key: "section", label: "Section", required: true, aliases: ["section", "sec", "class", "class section", "section name"], avoid: STUDENT_AVOID },
     { key: "email", label: "Email", required: false, aliases: [...EMAIL, "student email", "student mail"], avoid: [...STUDENT_AVOID, ...EMAIL_AVOID] },
+    { key: "fa_email", label: "FA Email", required: false, aliases: FA_EMAIL, avoid: EMAIL_AVOID },
   ],
   faculty: [
     { key: "emp_id", label: "Emp ID", required: true, aliases: EMP, avoid: ["student"] },
@@ -50,17 +53,12 @@ export const IMPORT_FIELDS: Record<ImportKind, ImportField[]> = {
     { key: "domains", label: "Domains", required: false, multi: true, aliases: ["domain", "domains", "area of interest", "areas of interest", "research area", "research areas", "research interest", "research interests", "research domain", "specialization", "specialisation", "area of specialization", "area of specialisation", "expertise", "area of expertise", "interest", "interests"] },
     { key: "cadre", label: "Cadre", required: true, aliases: ["cadre", "designation", "position", "role", "post", "category"], fallback: "OTHER" },
   ],
-  advisors: [
-    { key: "emp_id", label: "Emp ID", required: true, aliases: [...EMP, "fa emp id", "advisor emp id", "faculty advisor emp id", "fa id"], avoid: ["student"] },
-    { key: "section", label: "Section", required: true, aliases: ["section", "sec", "class", "class section", "section name"] },
-  ],
 };
 
 /** Template column titles (any of the aliases above work too). */
 export const IMPORT_HEADERS: Record<ImportKind, string[]> = {
   students: IMPORT_FIELDS.students.map((f) => f.label),
   faculty: IMPORT_FIELDS.faculty.map((f) => f.label),
-  advisors: IMPORT_FIELDS.advisors.map((f) => f.label),
 };
 
 export function validateImportFile(file: { name: string; size: number }) {
@@ -326,6 +324,7 @@ const NORMALIZE: Record<string, (v: string) => string> = {
   dept: (v) => v.replace(/\s+/g, " "),
   section: (v) => v.replace(/^(?:section|sec)\b\s*[:.\-–]?\s*/i, "").replace(/\s+/g, " ").toUpperCase(),
   email: (v) => firstOf(v.replace(/mailto:/gi, " ").toLowerCase(), (p) => p.includes("@")),
+  fa_email: (v) => firstOf(v.replace(/mailto:/gi, " ").toLowerCase(), (p) => p.includes("@")),
   srm_email: (v) => firstOf(v.replace(/mailto:/gi, " ").toLowerCase(), (p) => p.includes("@srmist")) || firstOf(v.toLowerCase(), (p) => p.includes("@")),
   phone: (v) => {
     const first = intText(v).split(/[,;/|]|\s{2,}/)[0] ?? "";
@@ -351,7 +350,7 @@ export function buildImportRows(sheets: ImportSheet[], layout: ImportLayout, kin
   const header = sheet.rows[layout.headerIndex]?.cells ?? [];
   const value = (key: string) => defaults[key]?.trim() || fields.find((f) => f.key === key)?.fallback || "";
   const missing = fields.filter((f) => f.required && !layout.mapping[f.key]?.length && !value(f.key)).map((f) => f.label);
-  const idKey = kind === "students" ? ["reg_no"] : kind === "faculty" ? ["emp_id", "srm_email"] : ["section"];
+  const idKey = kind === "students" ? ["reg_no"] : ["emp_id", "srm_email"];
   const headerCanon = header.map(canon);
   const rows: Record<string, string>[] = [];
   const rowNumbers: number[] = [];

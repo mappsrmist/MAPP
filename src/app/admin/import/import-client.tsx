@@ -13,20 +13,16 @@ import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, PageH
 import { Input, Select } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
-type Kind = "students" | "faculty" | "advisors";
+type Kind = "students" | "faculty";
 
 const TEMPLATES: Record<Kind, { sample: string[]; note: string }> = {
   students: {
-    sample: ["RA2411003010058", "Aarav Kumar", "CSE", "A", ""],
-    note: "Reg No, Name and Section are needed; Dept and Email are optional (Dept defaults to the value you set below). New students sign in with their registration number as the password and must change it at first login.",
+    sample: ["RA2400000000000", "Aarav Kumar", "CSE", "A", "", "priya@srmist.edu.in"],
+    note: "Reg No, Name and Section are needed; Dept and Email are optional (Dept defaults to the value you set below). FA Email is the student's Faculty Advisor's SRM email; it must match a faculty member's SRM Email, so import faculty first. A student whose FA Email is blank keeps the advisor they already have. New students sign in with their registration number as the password and must change it at first login.",
   },
   faculty: {
     sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI; Machine Learning", "OTHER"],
     note: "Emp ID, Name and SRM Email are needed. Cadre (HOD, Associate Chair or other) sets the seat and batch counts; it is read from a Cadre or Designation column (\"Professor & Head\" counts as HOD) and is OTHER when absent. Domains may be split by semicolons, commas or new lines, or spread over several columns. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
-  },
-  advisors: {
-    sample: ["EMP1001", "", "A"],
-    note: "One row per section, identified by the advisor's Emp ID (import faculty first; their SRM email is already on file). A faculty member may appear on several rows. Unknown faculty, unknown sections and sections already assigned to someone else are reported per row. Re-uploading the same mapping changes nothing.",
   },
 };
 
@@ -164,19 +160,19 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
 
   return (
     <>
-      <PageHeader title="Import data" description="Upload an Excel (.xlsx) workbook to create or update students and faculty, or to map sections to their Faculty Advisors. Re-uploading updates existing users without duplicating them." />
+      <PageHeader title="Import data" description="Upload an Excel (.xlsx) workbook to create or update students and faculty. Each student row can carry its Faculty Advisor's email. Re-uploading updates existing users without duplicating them." />
 
       <div role="tablist" aria-label="Import type" className="mb-4 inline-flex gap-1 rounded-xl bg-muted p-1">
-        {(["students", "faculty", "advisors"] as Kind[]).map((k) => (
+        {(["students", "faculty"] as Kind[]).map((k) => (
           <button key={k} disabled={busy || reading} role="tab" aria-selected={kind === k} onClick={() => reset(k)} className={cn("cursor-pointer rounded-lg px-4 py-1.5 text-sm font-medium capitalize", kind === k ? "bg-card shadow-sm" : "text-muted-foreground")}>
-            {k === "advisors" ? "Faculty Advisors" : k}
+            {k}
           </button>
         ))}
       </div>
 
       <Card>
         <CardHeader>
-            <CardTitle className="capitalize">{kind === "advisors" ? "Faculty Advisors" : kind} Excel workbook</CardTitle>
+            <CardTitle className="capitalize">{kind} Excel workbook</CardTitle>
           <CardDescription>{t.note}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -290,7 +286,7 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
           )}
 
           <Button disabled={reading || !rows || rows.length === 0 || !!built?.missing.length || tooMany} loading={busy || reading} onClick={runImport}>
-            Import {rows ? rows.length : ""} {kind === "advisors" ? "mapping(s)" : kind}
+            Import {rows ? rows.length : ""} {kind}
           </Button>
         </CardContent>
       </Card>
@@ -302,7 +298,7 @@ export function ImportClient({ initialKind = "students" }: { initialKind?: Kind 
               <CheckCircle2 className="h-5 w-5 text-success" aria-hidden /> Import result
             </CardTitle>
             <CardDescription>
-              {result.created} {kind === "advisors" ? "added" : "created"} · {result.updated} {kind === "advisors" ? "unchanged" : "updated"} · {result.errors.length} error(s)
+              {result.created} created · {result.updated} updated · {result.errors.length} error(s)
             </CardDescription>
           </CardHeader>
           {result.errors.length > 0 && (

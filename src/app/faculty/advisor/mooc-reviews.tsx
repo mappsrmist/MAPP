@@ -23,11 +23,11 @@ export function MoocReviews({ section, refreshKey, onChanged }: { section: strin
         deps={[section]}
         refreshKey={refreshKey}
         pollMs={20000}
-        emptyTitle="No MOOC requests for this section"
+        emptyTitle="No MOOC requests"
         searchPlaceholder="Search student name or registration number"
         onError={(message) => toast.error(message)}
         fetchPage={async (page, search) => {
-          const { data, error } = await supabase.rpc("fa_mooc_requests", { p_section: section, p_search: search || null, p_page: page });
+          const { data, error } = await supabase.rpc("fa_mooc_requests", { p_section: section || null, p_search: search || null, p_page: page });
           if (error) throw new Error(error.message);
           const rows = (data ?? []) as AdvisorMoocRequest[];
           return { rows, total: Number(rows[0]?.total_count ?? 0) };

@@ -8,7 +8,7 @@ import { useRealtime } from "@/lib/hooks";
 import { ClassOverview } from "@/components/class-overview";
 
 export function AdvisorClient({ sections }: { sections: string[] }) {
-  const [section, setSection] = React.useState(sections[0]);
+  const [section, setSection] = React.useState("");
   const [refresh, setRefresh] = React.useState(0);
   const bump = React.useCallback(() => setRefresh((n) => n + 1), []);
   useRealtime([{ table: "mooc_requests" }, { table: "students" }], bump);
@@ -16,19 +16,18 @@ export function AdvisorClient({ sections }: { sections: string[] }) {
     <>
       <PageHeader
         title="Faculty Advisor"
-        description="Review MOOC requests and CGPAs, and track MOOC and Minor choices for your assigned sections."
+        description="Review MOOC requests and CGPAs, and track MOOC and Minor choices for the students assigned to you as Faculty Advisor."
         actions={
           sections.length > 1 ? (
             <Select aria-label="Section" value={section} onChange={(e) => setSection(e.target.value)} className="w-40">
+              <option value="">All sections</option>
               {sections.map((s) => (
                 <option key={s} value={s}>
                   Section {s}
                 </option>
               ))}
             </Select>
-          ) : (
-            <span className="rounded-lg bg-muted px-3 py-2 text-sm font-medium">Section {sections[0]}</span>
-          )
+          ) : undefined
         }
       />
       <MoocReviews key={section} section={section} refreshKey={refresh} onChanged={bump} />

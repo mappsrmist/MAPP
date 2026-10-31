@@ -1,5 +1,11 @@
 # Changelog
 
+## Faculty Advisor per student
+- Apply `supabase/migrations/0014_student_faculty_advisor.sql` before deploying. It adds `students.fa_id`, copies each section's advisor onto its students, then drops `faculty_advisors` and the advisor admin RPCs.
+- The student import takes an optional **FA Email** column, matched with `faculty.srm_email`. An unknown email still saves the student and is reported on that row; a blank one keeps the current advisor. Re-uploading with a different FA Email replaces the advisor.
+- Removed: the admin **Faculty Advisors** page, the advisor Excel import and section-based mapping. A Faculty Advisor sees, and approves MOOC requests for, exactly the students assigned to them (optionally filtered by section).
+- Login placeholder and import template sample registration number is now `RA2400000000000`.
+
 ## v3
 
 Upgrade order: apply `supabase/migrations/0009_v3.sql` **before** deploying the v3 code (additive; it replaces the student RPCs so they stop returning `designation`). After v3 is live, apply `0010_drop_designation.sql`. Migration `0008` (student eligibility) must already be applied.

@@ -45,6 +45,10 @@ export const studentRowSchema = z.strictObject({
   dept: trimmed("dept", 100),
   section: trimmed("section", 20).transform((v) => v.toUpperCase()),
   email: optional.refine((v) => v === null || z.email().safeParse(v).success, "email is not valid"),
+  /** Faculty Advisor's SRM email; matched with faculty.srm_email. Blank leaves the student's advisor unchanged. */
+  fa_email: optional
+    .refine((v) => v === null || z.email().safeParse(v).success, "fa_email is not valid")
+    .transform((v) => (v ? v.toLowerCase() : null)),
 });
 export type StudentRow = z.infer<typeof studentRowSchema>;
 
@@ -88,18 +92,11 @@ export const facultyRowSchema = z.strictObject({
 });
 export type FacultyImportRow = z.infer<typeof facultyRowSchema>;
 
-/** Faculty Advisor mapping: one row per (employee, section); an employee may appear on several rows. */
-export const advisorRowSchema = z.strictObject({
-  emp_id: trimmed("emp_id"),
-  section: trimmed("section", 20).transform((v) => v.toUpperCase()),
-});
-export type AdvisorImportRow = z.infer<typeof advisorRowSchema>;
-
 export const importRequestSchema = z.strictObject({
-  type: z.enum(["students", "faculty", "advisors"]),
+  type: z.enum(["students", "faculty"]),
   offset: z.number().int().min(0).max(4999).default(0),
   rows: z.array(z.record(
-    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains"].includes(key)),
+    z.string().refine((key) => ["reg_no", "name", "dept", "section", "email", "fa_email", "emp_id", "srm_email", "cadre", "phone", "venue", "domains"].includes(key)),
     z.string().max(500).regex(/^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/),
   )).min(1).max(100),
   /** Excel row number of each row, for the error report */

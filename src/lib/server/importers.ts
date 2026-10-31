@@ -1,13 +1,15 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STUDENT_EMAIL_DOMAIN } from "@/lib/config";
-import type { AdvisorImportRow, FacultyImportRow, StudentRow } from "@/lib/validators";
+import type { FacultyImportRow, StudentRow } from "@/lib/validators";
 
 type Admin = SupabaseClient;
 type Role = "student" | "faculty";
 
 export interface Upserted {
   created: boolean;
+  /** The student was saved but the Faculty Advisor could not be linked; reported against the row. */
+  warning?: string;
 }
 
 /**
@@ -48,7 +50,16 @@ async function rollbackIfNew(admin: Admin, id: string, created: boolean) {
   if (created) await admin.auth.admin.deleteUser(id);
 }
 
+/** Faculty Advisor of a student: the faculty member whose SRM email equals the row's FA Email. */
+async function findAdvisor(admin: Admin, email: string): Promise<string | null> {
+  const { data, error } = await admin.from("faculty").select("id").eq("srm_email", email).maybeSingle();
+  if (error) throw new Error("Could not look up the Faculty Advisor");
+  return data?.id ?? null;
+}
+
 export async function upsertStudent(admin: Admin, row: StudentRow): Promise<Upserted> {
+  // a blank FA Email leaves the existing advisor alone; an unknown one never blocks the student itself
+  const advisorId = row.fa_email ? await findAdvisor(admin, row.fa_email) : null;
   const { id, created } = await ensureUser(admin, {
     role: "student",
     username: row.reg_no,
@@ -56,14 +67,17 @@ export async function upsertStudent(admin: Admin, row: StudentRow): Promise<Upse
     email: `${row.reg_no.toLowerCase()}@${STUDENT_EMAIL_DOMAIN}`,
   });
   const { error } = await admin.from("students").upsert(
-    { id, reg_no: row.reg_no, name: row.name, dept: row.dept, section: row.section, email: row.email },
+    { id, reg_no: row.reg_no, name: row.name, dept: row.dept, section: row.section, email: row.email, ...(advisorId ? { fa_id: advisorId } : {}) },
     { onConflict: "id" },
   );
   if (error) {
     await rollbackIfNew(admin, id, created);
     throw new Error("Could not save the student (duplicate registration number?)");
   }
-  return { created };
+  const warning = row.fa_email && !advisorId
+    ? `Faculty Advisor "${row.fa_email}" not found. The student was saved without an advisor; import the faculty first, then upload this row again.`
+    : undefined;
+  return { created, warning };
 }
 
 export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promise<Upserted> {
@@ -91,17 +105,4 @@ export async function upsertFaculty(admin: Admin, row: FacultyImportRow): Promis
     throw new Error("Could not save the faculty member (duplicate employee ID or email?)");
   }
   return { created };
-}
-
-/**
- * Maps one section to its Faculty Advisor. Idempotent: the same mapping again is "unchanged". A section that already
- * belongs to a different advisor is rejected here (the admin replaces it deliberately on the Faculty Advisors page).
- */
-export async function upsertAdvisor(admin: Admin, row: AdvisorImportRow): Promise<Upserted & { unchanged: boolean }> {
-  const { data, error } = await admin.rpc("_set_fa", { p_emp_id: row.emp_id, p_section: row.section, p_replace: false });
-  if (error) {
-    // the database messages are written for the admin ("Unknown employee ID.", "Section X is already assigned to Y.")
-    throw new Error(error.message);
-  }
-  return { created: data === "added", unchanged: data === "unchanged" };
 }

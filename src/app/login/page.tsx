@@ -14,7 +14,7 @@ import { PortalGuidelines, type LoginRole } from "./portal-guidelines";
 
 type Tab = LoginRole;
 const TABS: { role: Tab; label: string; icon: React.ReactNode; userLabel: string; placeholder: string }[] = [
-  { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration Number", placeholder: "RA2411003010058" },
+  { role: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" />, userLabel: "Registration Number", placeholder: "RA2400000000000" },
   { role: "faculty", label: "Faculty", icon: <Users className="h-4 w-4" />, userLabel: "SRM Email ID", placeholder: "name@srmist.edu.in" },
 ];
 

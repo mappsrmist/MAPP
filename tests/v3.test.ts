@@ -9,7 +9,7 @@ import { loginKeys } from "@/lib/server/throttle";
 import { BATCH_COLUMNS, GUIDE_EMP_COLUMN, buildSheetRows, guideTitle, sheetsFromDetails } from "@/lib/batch-sheet";
 import { buildBatchWorkbook } from "@/lib/excel";
 import { IMPORT_HEADERS } from "@/lib/import-excel";
-import { advisorRowSchema, facultyRowSchema, importRequestSchema, loginSchema, studentActionSchema } from "@/lib/validators";
+import { facultyRowSchema, studentRowSchema, importRequestSchema, loginSchema, studentActionSchema } from "@/lib/validators";
 import type { RequestDetail } from "@/lib/types";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
@@ -51,20 +51,21 @@ describe("admin sign-in goes through the Faculty tab", () => {
 describe("imports", () => {
   it("faculty import has no designation and keeps cadre", () => {
     expect(IMPORT_HEADERS.faculty).toEqual(["Emp ID", "Name", "SRM Email", "Phone", "Venue", "Domains", "Cadre"]);
-    expect(IMPORT_HEADERS.advisors).toEqual(["Emp ID", "Section"]);
+    expect(IMPORT_HEADERS.students).toEqual(["Reg No", "Name", "Dept", "Section", "Email", "FA Email"]);
     const row = { emp_id: "600323", name: "X", srm_email: "x@srmist.edu.in", cadre: "OTHER" };
     expect(facultyRowSchema.safeParse(row).success).toBe(true);
     expect(facultyRowSchema.safeParse({ ...row, designation: "Prof" }).success).toBe(false);
     expect(importRequestSchema.safeParse({ type: "faculty", rows: [{ ...row, designation: "P" }] }).success).toBe(false);
     expect(importRequestSchema.safeParse({ type: "faculty", rows: [row], rowNumbers: [7] }).success).toBe(true);
   });
-  it("validates advisor rows and normalises the section", () => {
-    expect(advisorRowSchema.parse({ emp_id: " 600323 ", section: " a2 " })).toEqual({ emp_id: "600323", section: "A2" });
-    expect(advisorRowSchema.safeParse({ emp_id: "600323" }).success).toBe(false);
-    expect(advisorRowSchema.safeParse({ section: "A" }).success).toBe(false);
-    expect(advisorRowSchema.safeParse({ emp_id: "600323", srm_email: "x@srmist.edu.in", section: "A" }).success).toBe(false);
-    expect(advisorRowSchema.safeParse({ emp_id: "600323", section: "A", role: "admin" }).success).toBe(false);
-    expect(importRequestSchema.safeParse({ type: "advisors", rows: [{ emp_id: "600323", section: "A" }] }).success).toBe(true);
+  it("validates the student's Faculty Advisor email", () => {
+    const row = { reg_no: "RA2400000000000", name: "A", dept: "CSE", section: "A" };
+    expect(studentRowSchema.parse({ ...row, fa_email: " Priya@SRMIST.edu.in " }).fa_email).toBe("priya@srmist.edu.in");
+    expect(studentRowSchema.parse(row).fa_email).toBeNull();
+    expect(studentRowSchema.parse({ ...row, fa_email: "" }).fa_email).toBeNull();
+    expect(studentRowSchema.safeParse({ ...row, fa_email: "not-an-email" }).success).toBe(false);
+    expect(importRequestSchema.safeParse({ type: "students", rows: [{ ...row, fa_email: "p@srmist.edu.in" }] }).success).toBe(true);
+    expect(importRequestSchema.safeParse({ type: "advisors", rows: [{ emp_id: "600323", section: "A" }] }).success).toBe(false);
   });
   it("validates the student remove / restore request", () => {
     const id = "123e4567-e89b-42d3-a456-426614174000";
@@ -146,7 +147,7 @@ describe("overview and no-designation checks", () => {
     expect(list).not.toMatch(/Dept|Department|Filter/);
   });
   it("the Faculty Advisor page is gated server-side and the nav item is conditional", () => {
-    expect(read("src/app/faculty/advisor/page.tsx")).toMatch(/my_fa_sections[\s\S]*notFound\(\)/);
+    expect(read("src/app/faculty/advisor/page.tsx")).toMatch(/is_faculty_advisor[\s\S]*notFound\(\)/);
     expect(read("src/app/faculty/layout.tsx")).toMatch(/isAdvisor \? \[/);
   });
 });
