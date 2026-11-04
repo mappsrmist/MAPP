@@ -1,21 +1,52 @@
 "use client";
 
 import * as React from "react";
-import { KeyRound, Snowflake } from "lucide-react";
+import { Download, KeyRound, Snowflake } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, PageHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { PagedTable } from "@/components/paged-table";
 import { FACULTY_COLS, PAGE_SIZE } from "@/lib/config";
+import { exportTable } from "@/lib/excel";
+import { fetchAll } from "@/lib/fetch-all";
 import { cleanSearch, useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
 import type { FacultyRow } from "@/lib/types";
 
 export function FacultyClient() {
+  const supabase = React.useMemo(() => createClient(), []);
+
+  async function download() {
+    try {
+      const rows = await fetchAll<FacultyRow>((f, t) => supabase.from("faculty").select(FACULTY_COLS).order("name").range(f, t) as unknown as PromiseLike<{ data: FacultyRow[] | null; error: { message: string } | null }>);
+      await exportTable("MAPP_Faculty.xlsx", "Faculty", [
+        { header: "Emp ID", key: "emp", width: 14 },
+        { header: "Name", key: "name", width: 30 },
+        { header: "SRM Email", key: "mail", width: 34 },
+        { header: "Domain", key: "dom", width: 36 },
+        { header: "Filled", key: "filled", width: 10 },
+        { header: "Available", key: "avail", width: 10 },
+        { header: "Total Seats", key: "total", width: 12 },
+        { header: "Frozen", key: "frozen", width: 10 },
+      ], rows.map((r) => ({ emp: r.emp_id, name: r.name, mail: r.srm_email, dom: r.domains.join(", "), filled: r.accepted_count, avail: r.available_seats, total: r.total_seats, frozen: r.frozen ? "Yes" : "No" })));
+      toast.success("Excel downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    }
+  }
+
   return (
     <>
-      <PageHeader title="Faculty" description="Every faculty member with their seats. Freeze a single faculty or reset a password here." />
+      <PageHeader
+        title="Faculty"
+        description="Every faculty member with their seats. Freeze a single faculty or reset a password here."
+        actions={
+          <Button variant="outline" size="sm" onClick={() => void download()}>
+            <Download className="h-4 w-4" /> Excel
+          </Button>
+        }
+      />
       <FacultyTable />
     </>
   );

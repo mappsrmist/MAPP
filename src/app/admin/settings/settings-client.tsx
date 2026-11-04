@@ -1,17 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Snowflake, Sun } from "lucide-react";
+import { Download, Snowflake, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader, Skeleton } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { PagedTable } from "@/components/paged-table";
 import { PAGE_SIZE } from "@/lib/config";
+import { exportTable } from "@/lib/excel";
+import { fetchAll } from "@/lib/fetch-all";
 import { useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
 import type { AuditEntry } from "@/lib/types";
-import { StudentList } from "../student-list";
 
 const ACTION_LABEL: Record<string, string> = {
   freeze: "Freeze",
@@ -78,6 +79,21 @@ export function SettingsClient() {
     setRefresh((n) => n + 1);
   }
 
+  async function downloadAudit() {
+    try {
+      const rows = await fetchAll<AuditEntry>((f, t) => supabase.from("audit_log").select("*").order("id", { ascending: false }).range(f, t));
+      await exportTable("MAPP_Audit_Log.xlsx", "Audit log", [
+        { header: "When", key: "when", width: 22 },
+        { header: "Action", key: "action", width: 30 },
+        { header: "Scope", key: "scope", width: 14 },
+        { header: "Details", key: "details", width: 80 },
+      ], rows.map((r) => ({ when: new Date(r.created_at).toLocaleString("en-GB"), action: ACTION_LABEL[r.action] ?? r.action, scope: r.scope, details: describe(r) })));
+      toast.success("Excel downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    }
+  }
+
   return (
     <>
       <PageHeader title="Settings & Freeze" description="Lock all allocation activity when the allocation window closes." />
@@ -106,15 +122,12 @@ export function SettingsClient() {
         <CardContent />
       </Card>
 
-      <h2 className="mb-3 mt-8 text-lg font-semibold">Exempt students</h2>
-      <p className="mb-3 text-sm text-muted-foreground">Students exempted from MOOC and Minor. Undo returns them to Not Opted.</p>
-      <StudentList kind="exempt" refreshKey={refresh} />
-
-      <h2 className="mb-3 mt-8 text-lg font-semibold">Removed students</h2>
-      <p className="mb-3 text-sm text-muted-foreground">Students removed from the portal (login disabled). Restore brings them back as Not Opted.</p>
-      <StudentList kind="removed" refreshKey={refresh} onChanged={() => setRefresh((n) => n + 1)} />
-
-      <h2 className="mb-3 mt-8 text-lg font-semibold">Audit log</h2>
+      <div className="mb-3 mt-8 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Audit log</h2>
+        <Button variant="outline" size="sm" onClick={() => void downloadAudit()}>
+          <Download className="h-4 w-4" /> Excel
+        </Button>
+      </div>
       <PagedTable<AuditEntry>
         rowKey={(r) => String(r.id)}
         refreshKey={refresh}

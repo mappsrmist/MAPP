@@ -33,7 +33,7 @@ const ACTIONS: { value: Action; label: string; when: (r: RequestDetail) => boole
   { value: "reset", label: "Reset status to Pending", when: (r) => r.status !== "pending" },
 ];
 
-export function AllocationsClient() {
+export function AllocationsClient({ embedded = false }: { embedded?: boolean }) {
   const supabase = React.useMemo(() => createClient(), []);
   const [refresh, setRefresh] = React.useState(0);
   const [faculty, setFaculty] = React.useState<FacultyOption[]>([]);
@@ -96,10 +96,8 @@ export function AllocationsClient() {
 
   return (
     <>
-      <PageHeader
-        title="Allocations"
-        description="Every request and its outcome. Admin actions work even while allocations are frozen and are written to the audit log."
-        actions={
+      {(() => {
+        const buttons = (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => run(exportList())}>
               <Download className="h-4 w-4" /> Table (Excel)
@@ -108,8 +106,17 @@ export function AllocationsClient() {
               <Download className="h-4 w-4" /> All allocations (template)
             </Button>
           </div>
-        }
-      />
+        );
+        return embedded ? (
+          <div className="mb-4 flex justify-end">{buttons}</div>
+        ) : (
+          <PageHeader
+            title="Allocations"
+            description="Every request and its outcome. Admin actions work even while allocations are frozen and are written to the audit log."
+            actions={buttons}
+          />
+        );
+      })()}
       <PagedTable<RequestDetail>
         rowKey={(r) => r.id}
         refreshKey={refresh}

@@ -100,7 +100,8 @@ export function StudentList({ kind, refreshKey = 0, onChanged }: { kind: Student
       { header: "Section", key: "section", width: 10 },
       { header: "Student SRM Mail", key: "mail", width: 34 },
       { header: "Faculty Advisor Name", key: "fa", width: 28 },
-    ], ((data ?? []) as AdminStudentRow[]).map((r) => ({ reg: r.reg_no, name: r.name, section: r.section ?? "", mail: r.email ?? "", fa: r.fa_name ?? "" })));
+      ...(kind === "exempt" ? [{ header: "Exempt Reason", key: "reason", width: 40 }] : []),
+    ], ((data ?? []) as AdminStudentRow[]).map((r) => ({ reg: r.reg_no, name: r.name, section: r.section ?? "", mail: r.email ?? "", fa: r.fa_name ?? "", reason: r.exempt_reason ?? "" })));
     toast.success("Excel downloaded");
   }
 

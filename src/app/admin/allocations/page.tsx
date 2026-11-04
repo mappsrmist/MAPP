@@ -1,5 +1,6 @@
-import { AllocationsClient } from "./allocations-client";
+import { redirect } from "next/navigation";
 
+// Allocations now live on the Students page (Minor allocations tab); keep old links working.
 export default function AdminAllocationsPage() {
-  return <AllocationsClient />;
+  redirect("/admin/students?tab=allocations");
 }
