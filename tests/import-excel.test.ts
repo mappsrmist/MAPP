@@ -141,6 +141,7 @@ describe("Excel imports: header and value normalising", () => {
     expect(["HOD", "hod", "H.O.D", "Professor & Head", "Head of the Department"].map(normalizeCadre)).toEqual(Array(5).fill("HOD"));
     expect(["ASSOC_CHAIR", "Associate Chair", "Associate Chairperson", "Professor & Asso Chairperson", "Assoc. Chair"].map(normalizeCadre)).toEqual(Array(5).fill("ASSOC_CHAIR"));
     expect(["", "OTHER", "Associate Professor", "Assistant Professor"].map(normalizeCadre)).toEqual(Array(4).fill("OTHER"));
+    expect(["JR_G", "Jr.G", "Jr G", "Assistant Professor (Jr.G)", "Assistant Professor(Jr. G)"].map(normalizeCadre)).toEqual(Array(5).fill("JR_G"));
   });
 });
 

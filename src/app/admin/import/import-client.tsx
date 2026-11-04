@@ -22,7 +22,7 @@ const TEMPLATES: Record<Kind, { sample: string[]; note: string }> = {
   },
   faculty: {
     sample: ["EMP1001", "Dr. Priya S", "priya@srmist.edu.in", "9876543210", "TP 801", "AI; Machine Learning", "OTHER"],
-    note: "Emp ID, Name and SRM Email are needed. Cadre (HOD, Associate Chair or other) sets the seat and batch counts; it is read from a Cadre or Designation column (\"Professor & Head\" counts as HOD) and is OTHER when absent. Domains may be split by semicolons, commas or new lines, or spread over several columns. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
+    note: "Emp ID, Name and SRM Email are needed. Cadre (HOD, Associate Chair, Assistant Professor (Jr.G) or other) sets the seat and batch counts; it is read from a Cadre or Designation column (\"Professor & Head\" counts as HOD) and is OTHER when absent. Domains may be split by semicolons, commas or new lines, or spread over several columns. New faculty sign in with their SRM email as username and their employee ID as the password, and must change it at first login.",
   },
 };
 

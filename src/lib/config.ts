@@ -6,17 +6,18 @@ export const ADMIN_USERNAME = "mappCtech";
 export const ADMIN_EMAIL = "admin@mapp.local";
 export const STUDENT_EMAIL_DOMAIN = "students.mapp.local";
 
-export const CADRES = ["HOD", "ASSOC_CHAIR", "OTHER"] as const;
+export const CADRES = ["HOD", "ASSOC_CHAIR", "JR_G", "OTHER"] as const;
 export type Cadre = (typeof CADRES)[number];
 
 export const CADRE_LABEL: Record<Cadre, string> = {
   HOD: "HOD",
   ASSOC_CHAIR: "Associate Chair",
+  JR_G: "Assistant Professor (Jr.G)",
   OTHER: "Faculty",
 };
 
 /** Mirrors public.cadre_seats() in the database (the DB is the source of truth). */
-export const CADRE_SEATS: Record<Cadre, number> = { HOD: 4, ASSOC_CHAIR: 4, OTHER: 8 };
+export const CADRE_SEATS: Record<Cadre, number> = { HOD: 4, ASSOC_CHAIR: 4, JR_G: 4, OTHER: 8 };
 export const seatsForCadre = (c: Cadre) => CADRE_SEATS[c];
 export const batchesForCadre = (c: Cadre) => CADRE_SEATS[c] / 2;
 

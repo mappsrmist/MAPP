@@ -55,13 +55,14 @@ export type StudentRow = z.infer<typeof studentRowSchema>;
 /**
  * Cadre from a cadre or designation cell: "HOD", "Professor & Head", "Head of the Department" → HOD;
  * "Associate Chair(person)", "Professor & Asso Chairperson" → ASSOC_CHAIR; anything else, including blank and
- * "Associate Professor", → OTHER.
+ * "Associate Professor", → OTHER. "Assistant Professor (Jr.G)" / "Jr G" → JR_G (plain "Assistant Professor" stays OTHER).
  */
 export function normalizeCadre(value: string): Cadre {
   const v = value.trim().toUpperCase();
   if ((CADRES as readonly string[]).includes(v)) return v as Cadre;
   if (/\bASSO(?:C(?:IATE)?)?\.?[\s_-]*CHAIR/.test(v)) return "ASSOC_CHAIR";
   if (/\bH\.?\s?O\.?\s?D\b|\bHEAD\b/.test(v)) return "HOD";
+  if (/\bJR\.?[\s_-]*G\b/.test(v)) return "JR_G";
   return "OTHER";
 }
 
