@@ -7,6 +7,7 @@ import { loginSchema } from "@/lib/validators";
 import { resolveLogin } from "@/lib/auth-utils";
 import { PORTAL_HOME } from "@/lib/config";
 import { enforceRateLimit } from "@/lib/server/rate-limit";
+import { createGate } from "@/lib/server/gate";
 
 // One generic error for every failure mode so usernames cannot be enumerated.
 const fail = () => NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
@@ -27,9 +28,9 @@ async function handlePost(request: Request) {
   const role = target.role;
 
   const keys = loginKeys(role, username, clientIp(request));
+  // The old shared per-IP success budget (one hot database row that every login on campus NAT had to
+  // update in turn) is replaced by the admission gate below; per-account budgets and failure locks remain.
   const limited = await enforceRateLimit([
-    // Campus NAT may carry the entire 3,000-student onboarding session.
-    { key: `login:${keys[2].key}`, limit: 5000, window: 900 },
     { key: `login:${keys[1].key}`, limit: role === "admin" ? 10 : 30, window: 900 },
   ]);
   if (limited) return limited;
@@ -87,4 +88,17 @@ async function handlePost(request: Request) {
   });
 }
 
-export const POST = safeApi(handlePost);
+// Login queue: only a few sign-ins touch Auth/database at once per server instance; the rest wait in
+// line for up to 12 s, then get a "busy" answer that the login page retries automatically.
+const loginGate = createGate(6, 12_000, 400);
+
+export const POST = safeApi(async (request) => {
+  const res = await loginGate.run(() => handlePost(request));
+  return (
+    res ??
+    NextResponse.json(
+      { error: "The portal is very busy. You are in the queue and will be signed in automatically.", busy: true },
+      { status: 503, headers: { "Retry-After": "4" } },
+    )
+  );
+});

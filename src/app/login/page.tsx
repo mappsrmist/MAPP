@@ -26,30 +26,51 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [queued, setQueued] = React.useState(0); // number of automatic retries while the portal is busy
   const tab = TABS.find((t) => t.role === role)!;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    setQueued(0);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, username, password }),
-      });
-      const json = await res.json().catch(() => ({}));
+      let res: Response;
+      let json: { error?: string; redirect?: string; busy?: boolean } = {};
+      // Waiting room: when the server answers "busy" (503 + busy flag) or the connection drops under load,
+      // retry on our own with jitter for up to ~3 minutes instead of making the student click again.
+      const deadline = Date.now() + 180_000;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role, username, password }),
+          });
+          json = await res.json().catch(() => ({}));
+          if (!(res.status === 503 && json.busy)) break;
+        } catch (err) {
+          if (Date.now() > deadline) throw err;
+        }
+        if (Date.now() > deadline) {
+          setError("The portal is very busy right now. Please try again in a minute.");
+          return;
+        }
+        setQueued(attempt + 1);
+        await new Promise((r) => setTimeout(r, 2000 + Math.random() * 4000));
+      }
       if (!res.ok) {
         setError(json.error ?? (res.status === 500 ? "Server configuration error. Please check server logs and environment variables." : "Could not sign in"));
         return;
       }
       toast.success("Signed in");
-      router.replace(json.redirect);
+      router.replace(json.redirect ?? "/");
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
     } finally {
       setBusy(false);
+      setQueued(0);
     }
   }
 
@@ -119,6 +140,11 @@ export default function LoginPage() {
             {error && (
               <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
+              </p>
+            )}
+            {busy && queued > 0 && (
+              <p role="status" className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                Many students are signing in right now. You are in the queue and will be signed in automatically. Please keep this page open.
               </p>
             )}
             <Button type="submit" className="w-full" size="lg" loading={busy}>
