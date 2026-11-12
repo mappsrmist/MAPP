@@ -153,7 +153,7 @@ export function SettingsClient() {
             <CardTitle>Master data</CardTitle>
             <CardDescription>
               One Excel file with every student and faculty record: all profile details, choices, requests, batches, applications, MOOC requests and
-              Faculty Advisors. Read-only: it does not change any data. Contains personal details, so store it securely.
+              each student's Faculty Advisor. Read-only: it does not change any data. Contains personal details, so store it securely.
             </CardDescription>
           </div>
           <Button onClick={() => void downloadMaster()} loading={exporting}>

@@ -22,7 +22,7 @@ const pretty = (v: unknown): string | number | boolean | Date => {
 /** Builds the complete master workbook (Students, Faculty, Requests, Batches, Applications, MOOC, Advisors). */
 export async function buildMasterWorkbook(): Promise<ArrayBuffer> {
   const admin = createAdminClient();
-  const [profiles, students, faculty, requests, batches, members, applications, mooc, advisors] = await Promise.all([
+  const [profiles, students, faculty, requests, batches, members, applications, mooc] = await Promise.all([
     readTable(admin, "profiles", "id"),
     readTable(admin, "students", "id"),
     readTable(admin, "faculty", "id"),
@@ -31,7 +31,6 @@ export async function buildMasterWorkbook(): Promise<ArrayBuffer> {
     readTable(admin, "batch_members", "batch_id"),
     readTable(admin, "applications", "id"),
     readTable(admin, "mooc_requests", "id"),
-    readTable(admin, "faculty_advisors", "id"),
   ]);
 
   const username = new Map(profiles.map((p) => [p.id as string, p.username as string]));
@@ -55,12 +54,10 @@ export async function buildMasterWorkbook(): Promise<ArrayBuffer> {
     appByStudent.set(a.student1_id as string, a);
     if (a.student2_id) appByStudent.set(a.student2_id as string, a);
   });
-  const advisorFor = new Map(advisors.map((a) => [String(a.section).toUpperCase(), a]));
 
   const studentRows: Row[] = students.map((s) => {
     const minor = memberOf.get(`${s.id}:minor`);
     const batch = minor ? bat.get(minor.batch_id as string) : undefined;
-    const adv = advisorFor.get(String(s.section ?? "").trim().toUpperCase());
     const app = appByStudent.get(s.id as string);
     const myReqs = reqByStudent.get(s.id as string) ?? [];
     const fa = s.fa_id ? fac.get(s.fa_id as string) : undefined;
@@ -68,8 +65,8 @@ export async function buildMasterWorkbook(): Promise<ArrayBuffer> {
       reg_no: s.reg_no, name: s.name, dept: s.dept, section: s.section, email: s.email,
       login_username: username.get(s.id as string), must_change_password: mustChange.get(s.id as string),
       choice: s.choice, choice_at: s.choice_at, mooc_cgpa: s.mooc_cgpa, is_active: s.is_active,
-      faculty_advisor_name: (fa?.name as string) ?? (adv ? fName(adv.faculty_id) : ""),
-      faculty_advisor_emp_id: (fa?.emp_id as string) ?? (adv ? fEmp(adv.faculty_id) : ""),
+      faculty_advisor_name: (fa?.name as string) ?? "",
+      faculty_advisor_emp_id: (fa?.emp_id as string) ?? "",
       minor_faculty_name: batch ? fName(batch.faculty_id) : "", minor_faculty_emp_id: batch ? fEmp(batch.faculty_id) : "",
       minor_batch_no: batch?.batch_no, minor_slot: minor?.slot,
       requests_total: myReqs.length,
@@ -88,7 +85,7 @@ export async function buildMasterWorkbook(): Promise<ArrayBuffer> {
       total_seats: f.total_seats, accepted_count: f.accepted_count, available_seats: f.available_seats, frozen: f.frozen,
       batches_total: fb.length,
       batches_full: fb.filter((b) => members.filter((m) => m.batch_id === b.id).length === 2).length,
-      advisor_sections: advisors.filter((a) => a.faculty_id === f.id).map((a) => a.section).join(", "),
+      advisees: students.filter((s) => s.fa_id === f.id && s.is_active).length,
       created_at: f.created_at, updated_at: f.updated_at, faculty_id: f.id,
     };
   });
@@ -122,14 +119,12 @@ export async function buildMasterWorkbook(): Promise<ArrayBuffer> {
     requested_at: m.requested_at, reviewed_at: m.reviewed_at,
   }));
 
-  const advisorRows: Row[] = advisors.map((a) => ({ section: a.section, faculty_emp_id: fEmp(a.faculty_id), faculty_name: fName(a.faculty_id) }));
-
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
   const sheets: [string, Row[]][] = [
     ["Students", studentRows], ["Faculty", facultyRows], ["Requests", requestRows], ["Batches", batchRows],
-    ["Applications", applicationRows], ["MOOC", moocRows], ["Faculty Advisors", advisorRows],
+    ["Applications", applicationRows], ["MOOC", moocRows],
   ];
   for (const [name, rows] of sheets) {
     const ws = wb.addWorksheet(name);
