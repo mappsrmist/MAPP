@@ -36,7 +36,7 @@ export function StudentShell({ userId, name, regNo, choice, accepted, frozen, ch
     setLive({ choice: (s.data?.choice as Props["choice"]) ?? null, accepted: (r.data?.length ?? 0) > 0 });
   }, [userId]);
 
-  useRealtime([{ table: "requests", filter: `student_id=eq.${userId}` }, { table: "students", filter: `id=eq.${userId}` }], () => void load());
+  useRealtime([{ table: "requests", filter: `student_id=eq.${userId}` }, { table: "students", filter: `id=eq.${userId}` }], () => void load(), false);
 
   React.useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") void load(); };
@@ -68,7 +68,7 @@ export function StudentShell({ userId, name, regNo, choice, accepted, frozen, ch
   ];
 
   return (
-    <PortalShell title="Student Portal" userName={name} userSub={regNo} nav={nav} frozen={frozen}>
+    <PortalShell liveUpdates={false} title="Student Portal" userName={name} userSub={regNo} nav={nav} frozen={frozen}>
       {children}
     </PortalShell>
   );

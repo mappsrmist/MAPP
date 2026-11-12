@@ -17,7 +17,7 @@ export function useDebounced<T>(value: T, ms = 300): T {
  * Calls `onChange` whenever a row in one of `tables` changes (Supabase Realtime; RLS decides
  * what each user receives). Also fires when the tab regains focus, as a safety net.
  */
-export function useRealtime(tables: { table: string; filter?: string }[], onChange: () => void) {
+export function useRealtime(tables: { table: string; filter?: string }[], onChange: () => void, enabled = true) {
   const cb = useRef(onChange);
   useEffect(() => {
     cb.current = onChange;
@@ -25,6 +25,8 @@ export function useRealtime(tables: { table: string; filter?: string }[], onChan
   const key = JSON.stringify(tables);
 
   useEffect(() => {
+    // Students (thousands at once) skip the websocket entirely and rely on light polling instead.
+    if (!enabled) return;
     const supabase = createClient();
     const refresh = createRefreshBatcher(() => {
       if (document.visibilityState === "visible") cb.current();
@@ -44,7 +46,7 @@ export function useRealtime(tables: { table: string; filter?: string }[], onChan
       refresh.cancel();
       supabase.removeChannel(channel);
     };
-  }, [key]);
+  }, [key, enabled]);
 }
 
 /** Strip characters that have meaning inside a PostgREST `or()` / `ilike` filter value. */

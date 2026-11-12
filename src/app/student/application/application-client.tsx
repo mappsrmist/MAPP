@@ -99,7 +99,12 @@ export function ApplicationClient() {
   // a team mate's save (or an admin change) arrives live; never overwrite what this student is typing
   useRealtime([{ table: "applications" }, { table: "requests" }], () => {
     if (!isDirty) void load();
-  });
+  }, false);
+  // no websocket for students: pick up a team mate's save with a light poll while the tab is visible
+  React.useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === "visible" && !isDirty) void load(); }, 60000);
+    return () => clearInterval(t);
+  }, [isDirty, load]);
 
   if (locked) {
     return (

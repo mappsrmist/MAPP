@@ -41,7 +41,7 @@ export function MinorClient({ userId }: { userId: string }) {
   useRealtime([{ table: "requests", filter: `student_id=eq.${userId}` }], () => {
     void loadStatus();
     setRefresh((n) => n + 1);
-  });
+  }, false);
 
   const active = status && (status.status === "pending" || status.status === "accepted");
   const declined = status?.status === "declined" ? status : null;

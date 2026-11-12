@@ -23,14 +23,19 @@ export function FreezeBanner({ message = MSG.FROZEN }: { message?: string }) {
 }
 
 /** Holds the global freeze flag, kept live through Realtime, and shows the banner on every portal page. */
-export function FreezeProvider({ initial, children }: { initial: boolean; children: React.ReactNode }) {
+export function FreezeProvider({ initial, live = true, children }: { initial: boolean; live?: boolean; children: React.ReactNode }) {
   const [frozen, setFrozen] = React.useState(initial);
 
   const load = React.useCallback(async () => {
     const { data } = await createClient().from("system_settings").select("global_frozen").eq("id", 1).maybeSingle();
     if (data) setFrozen(data.global_frozen);
   }, []);
-  useRealtime([{ table: "system_settings" }], () => void load());
+  useRealtime([{ table: "system_settings" }], () => void load(), live);
+  React.useEffect(() => {
+    if (live) return;
+    const t = setInterval(() => document.visibilityState === "visible" && void load(), 60000);
+    return () => clearInterval(t);
+  }, [live, load]);
 
   return (
     <FreezeCtx.Provider value={frozen}>

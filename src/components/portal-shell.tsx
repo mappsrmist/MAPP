@@ -32,6 +32,7 @@ export function PortalShell({
   userSub,
   nav,
   frozen = false,
+  liveUpdates = true,
   children,
 }: {
   title: string;
@@ -40,6 +41,8 @@ export function PortalShell({
   nav: NavItem[];
   /** The admin's global freeze flag at render time (kept live on the client). */
   frozen?: boolean;
+  /** false = no Realtime websocket (students; polls instead) */
+  liveUpdates?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -130,7 +133,7 @@ export function PortalShell({
             </div>
           </div>
           <main id="main-content" tabIndex={-1} className="min-w-0 pb-8 focus:outline-none">
-            <FreezeProvider initial={frozen}>{children}</FreezeProvider>
+            <FreezeProvider initial={frozen} live={liveUpdates}>{children}</FreezeProvider>
           </main>
           <footer className="border-t py-5 text-xs leading-relaxed text-muted-foreground">Department of Computing Technologies · SRMIST</footer>
         </div>

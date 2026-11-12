@@ -3,4 +3,5 @@
 --   delete from request_budgets where window_start < now() - 1 day
 -- with no index on window_start (full scan + write on every call), and all logins from campus NAT
 -- update the single hot row 'login:ip:<ip>' (row-lock serialisation during a login burst).
-create index concurrently if not exists request_budgets_window_idx on public.request_budgets (window_start);
+-- (No CONCURRENTLY: the SQL editor runs in a transaction and the table is tiny, so this takes milliseconds.)
+create index if not exists request_budgets_window_idx on public.request_budgets (window_start);
