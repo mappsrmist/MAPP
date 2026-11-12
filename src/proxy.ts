@@ -5,6 +5,12 @@ import { PORTAL_HOME, type Role } from "@/lib/config";
 const SECTIONS = ["student", "faculty", "admin"];
 
 /**
+ * Maintenance mode: ON by default. Set MAINTENANCE_MODE=off in the environment (and redeploy)
+ * to bring the portal back. While on, no auth/DB call is made at all.
+ */
+const MAINTENANCE = process.env.MAINTENANCE_MODE !== "off";
+
+/**
  * Route protection (Next.js 16 "proxy", formerly middleware):
  *  - unauthenticated users go to /login
  *  - users flagged must_change_password are pinned to /force-password
@@ -12,6 +18,20 @@ const SECTIONS = ["student", "faculty", "admin"];
  * Pages and RPCs re-check all of this server-side; this is the first gate, not the only one.
  */
 export async function proxy(request: NextRequest) {
+  if (MAINTENANCE) {
+    const { pathname } = request.nextUrl;
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Under maintenance. Please try again later." },
+        { status: 503, headers: { "Retry-After": "3600", "Cache-Control": "no-store" } },
+      );
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/maintenance";
+    url.search = "";
+    return NextResponse.rewrite(url, { status: 503, headers: { "Retry-After": "3600", "Cache-Control": "no-store" } });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -36,6 +56,9 @@ export async function proxy(request: NextRequest) {
   };
 
   const path = request.nextUrl.pathname;
+  if (!(path === "/" || path === "/login" || path === "/force-password" || SECTIONS.includes(path.split("/")[1] ?? ""))) {
+    return NextResponse.next({ request });
+  }
   const first = path.split("/")[1] ?? "";
   const isPortal = SECTIONS.includes(first);
   const isForce = path === "/force-password";
@@ -78,5 +101,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/force-password", "/student/:path*", "/faculty/:path*", "/admin/:path*"],
+  // Maintenance mode needs to catch everything except static assets; normal mode only acts on the routes below.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|apple-icon.png|brand/).*)"],
 };
