@@ -57,11 +57,13 @@ async function handlePost(request: Request) {
     return fail();
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, must_change_password")
-    .eq("id", data.user.id)
-    .maybeSingle();
+  // profile and (for students) the active flag are independent reads: fetch them together
+  const [{ data: profile }, studentRes] = await Promise.all([
+    supabase.from("profiles").select("role, must_change_password").eq("id", data.user.id).maybeSingle(),
+    role === "student"
+      ? supabase.from("students").select("is_active").eq("id", data.user.id).maybeSingle()
+      : Promise.resolve(null),
+  ]);
 
   // The credentials may be valid but belong to a different role than the tab used.
   if (!profile || profile.role !== role) {
@@ -71,13 +73,10 @@ async function handlePost(request: Request) {
   }
 
   // A removed student is refused exactly like a wrong password (their auth login is banned as well).
-  if (role === "student") {
-    const { data: student } = await supabase.from("students").select("is_active").eq("id", data.user.id).maybeSingle();
-    if (!student?.is_active) {
-      await supabase.auth.signOut();
-      await recordFailure(keys);
-      return fail();
-    }
+  if (role === "student" && !studentRes?.data?.is_active) {
+    await supabase.auth.signOut();
+    await recordFailure(keys);
+    return fail();
   }
 
   await clearFailures(keys);
