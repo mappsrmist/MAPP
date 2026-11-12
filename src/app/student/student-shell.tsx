@@ -40,7 +40,7 @@ export function StudentShell({ userId, name, regNo, choice, accepted, frozen, ch
 
   React.useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") void load(); };
-    const timer = setInterval(refresh, 20000);
+    const timer = setInterval(refresh, 90000);
     window.addEventListener("focus", refresh);
     return () => { clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [load]);

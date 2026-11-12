@@ -49,7 +49,7 @@ export function MinorClient({ userId }: { userId: string }) {
   // the faculty's seat count on the status card is not a Realtime source for students: poll while visible
   React.useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => document.visibilityState === "visible" && void loadStatus(), 20000);
+    const t = setInterval(() => document.visibilityState === "visible" && void loadStatus(), 60000);
     return () => clearInterval(t);
   }, [active, loadStatus]);
 
@@ -108,7 +108,7 @@ function FacultyList({
         searchPlaceholder="Search by name or employee ID"
         deps={[domain]}
         refreshKey={refreshKey}
-        pollMs={20000}
+        pollMs={45000}
         emptyTitle="No faculty available"
         emptyHint="Faculty with no remaining seats are hidden. Try changing the search or domain filter."
         onError={(m) => toast.error(m)}

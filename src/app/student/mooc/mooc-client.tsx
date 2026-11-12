@@ -36,7 +36,7 @@ export function MoocClient({ choice, request }: { choice: StudentChoice; request
 
   useRealtime([{ table: "mooc_requests" }, { table: "students" }], () => router.refresh());
   React.useEffect(() => {
-    const timer = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 20000);
+    const timer = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 90000);
     return () => clearInterval(timer);
   }, [router]);
   const opted = choice === "mooc";

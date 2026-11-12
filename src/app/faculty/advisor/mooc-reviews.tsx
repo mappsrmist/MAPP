@@ -22,7 +22,7 @@ export function MoocReviews({ section, refreshKey, onChanged }: { section: strin
         rowKey={(r) => r.request_id}
         deps={[section]}
         refreshKey={refreshKey}
-        pollMs={20000}
+        pollMs={45000}
         emptyTitle="No MOOC requests"
         searchPlaceholder="Search student name or registration number"
         onError={(message) => toast.error(message)}

@@ -63,11 +63,11 @@ export async function proxy(request: NextRequest) {
   const isPortal = SECTIONS.includes(first);
   const isForce = path === "/force-password";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Local JWT verification (also refreshes an expiring session); no Auth-server round trip per request.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (!user) {
+  if (!userId) {
     return isPortal || isForce ? redirect("/login") : response;
   }
 
@@ -81,7 +81,7 @@ export async function proxy(request: NextRequest) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, must_change_password")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (!profile) {

@@ -12,15 +12,17 @@ import { PORTAL_HOME, type Role } from "@/lib/config";
 // React cache is scoped to one server render, never shared between users or requests.
 export const requireRole = cache(async (role: Role) => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // getClaims verifies the JWT locally (signing keys are cached) instead of a round trip to the Auth
+  // server on every navigation. Role, password flag and is_active are still re-read from the database below.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+  if (!userId) redirect("/login");
+  const user = { id: userId };
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, must_change_password")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
   if (!profile) redirect("/login");
   if (profile.must_change_password) redirect("/force-password");
