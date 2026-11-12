@@ -79,6 +79,31 @@ export function SettingsClient() {
     setRefresh((n) => n + 1);
   }
 
+  const [exporting, setExporting] = React.useState(false);
+  async function downloadMaster() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/admin/master-export", { method: "POST" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? "Export failed. Please try again.");
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `MAPP_Master_Data_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("Master data downloaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function downloadAudit() {
     try {
       const rows = await fetchAll<AuditEntry>((f, t) => supabase.from("audit_log").select("*").order("id", { ascending: false }).range(f, t));
@@ -118,6 +143,22 @@ export function SettingsClient() {
               {frozen ? "Unfreeze allocations" : "Freeze allocations"}
             </Button>
           )}
+        </CardHeader>
+        <CardContent />
+      </Card>
+
+      <Card className="mb-8">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle>Master data</CardTitle>
+            <CardDescription>
+              One Excel file with every student and faculty record: all profile details, choices, requests, batches, applications, MOOC requests and
+              Faculty Advisors. Read-only: it does not change any data. Contains personal details, so store it securely.
+            </CardDescription>
+          </div>
+          <Button onClick={() => void downloadMaster()} loading={exporting}>
+            <Download className="h-4 w-4" /> Download master data
+          </Button>
         </CardHeader>
         <CardContent />
       </Card>
