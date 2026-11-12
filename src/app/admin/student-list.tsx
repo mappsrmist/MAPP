@@ -9,6 +9,7 @@ import { Field, Input } from "@/components/ui/form";
 import { PagedTable } from "@/components/paged-table";
 import { exportTable } from "@/lib/excel";
 import { createClient } from "@/lib/supabase/client";
+import { PersonDetailsDialog, type PersonRef } from "@/app/admin/person-details";
 import type { AdminStudentRow } from "@/lib/types";
 
 export type StudentListKind = "mooc_pending" | "mooc" | "not_opted" | "exempt" | "removed";
@@ -34,6 +35,7 @@ export function StudentList({ kind, refreshKey = 0, onChanged }: { kind: Student
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [local, setLocal] = React.useState(0);
   const [pending, setPending] = React.useState<Pending | null>(null);
+  const [person, setPerson] = React.useState<PersonRef | null>(null);
   const [exempt, setExempt] = React.useState<{ ids: string[]; label: string } | null>(null);
   const selectable = kind === "not_opted";
 
@@ -159,7 +161,7 @@ export function StudentList({ kind, refreshKey = 0, onChanged }: { kind: Student
               }]
             : []),
           { header: "Reg No", cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
-          { header: "Name", cell: (r) => <span className="font-medium">{r.name}</span> },
+          { header: "Name", cell: (r) => <button type="button" className="cursor-pointer text-left font-medium text-primary hover:underline" onClick={() => setPerson({ kind: "student", id: r.id })}>{r.name}</button> },
           { header: "Section", cell: (r) => r.section ?? "—" },
           { header: "Student SRM Mail", cell: (r) => r.email ?? "—" },
           { header: "Faculty Advisor Name", cell: (r) => r.fa_name ?? "—" },
@@ -204,6 +206,7 @@ export function StudentList({ kind, refreshKey = 0, onChanged }: { kind: Student
         ]}
       />
 
+      <PersonDetailsDialog person={person} onClose={() => setPerson(null)} />
       <ConfirmDialog
         open={!!pending}
         onOpenChange={(o) => !o && setPending(null)}

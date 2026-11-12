@@ -14,6 +14,7 @@ import { exportBatchWorkbook, exportTable } from "@/lib/excel";
 import { fetchAll } from "@/lib/fetch-all";
 import { cleanSearch, useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
+import { PersonDetailsDialog, type PersonRef } from "@/app/admin/person-details";
 import type { RequestDetail } from "@/lib/types";
 
 type Action = "section" | "move" | "remove" | "reset";
@@ -41,6 +42,7 @@ export function AllocationsClient({ embedded = false }: { embedded?: boolean }) 
   const [status, setStatus] = React.useState("");
   const [section, setSection] = React.useState("");
   const [pending, setPending] = React.useState<{ row: RequestDetail; action: Action } | null>(null);
+  const [person, setPerson] = React.useState<PersonRef | null>(null);
 
   const loadFaculty = React.useCallback(async () => {
     const { data } = await supabase.from("faculty").select("id, name, emp_id, available_seats").order("name").limit(1000);
@@ -167,10 +169,10 @@ export function AllocationsClient({ embedded = false }: { embedded?: boolean }) 
         }}
         columns={[
           { header: "Guide Emp ID", cell: (r) => <span className="font-mono text-xs">{r.faculty_emp_id}</span> },
-          { header: "Guide Name", cell: (r) => <span className="font-medium">{r.faculty_name}</span> },
+          { header: "Guide Name", cell: (r) => <button type="button" className="cursor-pointer text-left font-medium text-primary hover:underline" onClick={() => setPerson({ kind: "faculty", id: r.faculty_id })}>{r.faculty_name}</button> },
           { header: "Batch", cell: (r) => (r.batch_no ? <Badge tone="info">B{r.batch_no}</Badge> : <span className="text-muted-foreground">—</span>) },
-          { header: "Reg No", cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
-          { header: "Student", cell: (r) => <span className="font-medium">{r.student_name}</span> },
+          { header: "Reg No", cell: (r) => <button type="button" className="cursor-pointer font-mono text-xs text-primary hover:underline" onClick={() => setPerson({ kind: "student", id: r.student_id })}>{r.reg_no}</button> },
+          { header: "Student", cell: (r) => <button type="button" className="cursor-pointer text-left font-medium text-primary hover:underline" onClick={() => setPerson({ kind: "student", id: r.student_id })}>{r.student_name}</button> },
           { header: "Section", cell: (r) => r.section ?? "—" },
           { header: "Faculty Advisor Name", cell: (r) => r.advisor_name ?? r.fa_name ?? "—" },
           { header: "Project Title", cell: (r) => r.project_title ?? "—" },
@@ -197,6 +199,7 @@ export function AllocationsClient({ embedded = false }: { embedded?: boolean }) 
         ]}
       />
 
+      <PersonDetailsDialog person={person} onClose={() => setPerson(null)} />
       <SectionDialog
         row={pending?.action === "section" ? pending.row : null}
         onClose={() => setPending(null)}

@@ -12,6 +12,7 @@ import { exportTable } from "@/lib/excel";
 import { fetchAll } from "@/lib/fetch-all";
 import { cleanSearch, useRealtime } from "@/lib/hooks";
 import { createClient } from "@/lib/supabase/client";
+import { PersonDetailsDialog, type PersonRef } from "@/app/admin/person-details";
 import type { FacultyRow } from "@/lib/types";
 
 export function FacultyClient() {
@@ -56,6 +57,7 @@ function FacultyTable() {
   const [refresh, setRefresh] = React.useState(0);
   const onChange = () => setRefresh((n) => n + 1);
   const supabase = React.useMemo(() => createClient(), []);
+  const [person, setPerson] = React.useState<PersonRef | null>(null);
   const [confirm, setConfirm] = React.useState<null | { title: string; description: string; label: string; destructive?: boolean; run: () => Promise<void> }>(null);
 
   async function rpc(fn: string, args: Record<string, unknown>, ok: string) {
@@ -95,7 +97,9 @@ function FacultyTable() {
         }}
         columns={[
           { header: "Emp ID", cell: (r) => <span className="font-mono text-xs">{r.emp_id}</span> },
-          { header: "Name", cell: (r) => <span className="font-medium">{r.name}</span> },
+          { header: "Name", cell: (r) => <button type="button" className="cursor-pointer text-left font-medium text-primary hover:underline" onClick={() => setPerson({ kind: "faculty", id: r.id })}>{r.name}</button> },
+          { header: "SRM Email", cell: (r) => <span className="break-all text-xs">{r.srm_email}</span> },
+          { header: "Phone", cell: (r) => r.phone ?? "—" },
           { header: "Domain", cell: (r) => (r.domains.length ? r.domains.join(", ") : "—") },
           { header: "Filled", cell: (r) => r.accepted_count },
           { header: "Available", cell: (r) => <Badge tone={r.available_seats > 0 ? "success" : "danger"}>{r.available_seats} / {r.total_seats}</Badge> },
@@ -143,6 +147,7 @@ function FacultyTable() {
           },
         ]}
       />
+      <PersonDetailsDialog person={person} onClose={() => setPerson(null)} />
       <ConfirmDialog
         open={!!confirm}
         onOpenChange={(o) => !o && setConfirm(null)}
