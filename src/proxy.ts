@@ -5,10 +5,10 @@ import { PORTAL_HOME, type Role } from "@/lib/config";
 const SECTIONS = ["student", "faculty", "admin"];
 
 /**
- * Maintenance mode: ON by default. Set MAINTENANCE_MODE=off in the environment (and redeploy)
- * to bring the portal back. While on, no auth/DB call is made at all.
+ * Maintenance mode: OFF by default. Set MAINTENANCE_MODE=on (also accepts true/1/yes) in the environment and
+ * redeploy to close the portal. While on, no auth/DB call is made at all. Read per request, not at startup.
  */
-const MAINTENANCE = process.env.MAINTENANCE_MODE !== "off";
+const maintenanceOn = () => ["on", "true", "1", "yes"].includes((process.env.MAINTENANCE_MODE ?? "").trim().toLowerCase());
 
 /**
  * Route protection (Next.js 16 "proxy", formerly middleware):
@@ -18,7 +18,7 @@ const MAINTENANCE = process.env.MAINTENANCE_MODE !== "off";
  * Pages and RPCs re-check all of this server-side; this is the first gate, not the only one.
  */
 export async function proxy(request: NextRequest) {
-  if (MAINTENANCE) {
+  if (maintenanceOn()) {
     const { pathname } = request.nextUrl;
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
