@@ -2,7 +2,7 @@
 -- Read-only; both functions assert the admin role.
 
 create or replace function public.admin_student_detail(p_student uuid)
-returns jsonb language plpgsql stable security definer set search_path = public as $$
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
   v jsonb;
 begin
@@ -56,7 +56,7 @@ begin
 end $$;
 
 create or replace function public.admin_faculty_detail(p_faculty uuid)
-returns jsonb language plpgsql stable security definer set search_path = public as $$
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare
   v jsonb;
 begin
