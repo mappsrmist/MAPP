@@ -85,7 +85,7 @@ export function StudentsClient({ initialTab = "section" }: { initialTab?: Studen
               </span>
             )}
           </div>
-          {section ? <ClassOverview section={section} refreshKey={refresh} /> : <p className="text-sm text-muted-foreground">No sections yet. Import students first.</p>}
+          {section ? <ClassOverview section={section} refreshKey={refresh} detailHref={(id) => `/admin/students/${id}`} /> : <p className="text-sm text-muted-foreground">No sections yet. Import students first.</p>}
         </>
       )}
 

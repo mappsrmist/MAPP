@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/card";
@@ -35,7 +36,7 @@ const CHIPS: { key: ClassStatus | null; label: string; count: "total" | ClassSta
  * section) and by the admin Section view (everyone in the section). The RPCs scope the rows to the caller's
  * advisees (or the admin), so this component trusts nothing.
  */
-export function ClassOverview({ section = "", refreshKey = 0 }: { section?: string; refreshKey?: number }) {
+export function ClassOverview({ section = "", refreshKey = 0, detailHref }: { section?: string; refreshKey?: number; detailHref?: (studentId: string) => string }) {
   const supabase = React.useMemo(() => createClient(), []);
   const [loaded, setLoaded] = React.useState<{ section: string; counts: ClassCounts } | null>(null);
   const [status, setStatus] = React.useState<ClassStatus | null>(null);
@@ -129,7 +130,17 @@ export function ClassOverview({ section = "", refreshKey = 0 }: { section?: stri
         }}
         columns={[
           { header: "Reg No", cell: (r) => <span className="font-mono text-xs">{r.reg_no}</span> },
-          { header: "Name", cell: (r) => <span className="font-medium">{r.name}</span> },
+          {
+            header: "Name",
+            cell: (r) =>
+              detailHref ? (
+                <Link href={detailHref(r.student_id)} className="font-medium text-primary underline-offset-2 hover:underline">
+                  {r.name}
+                </Link>
+              ) : (
+                <span className="font-medium">{r.name}</span>
+              ),
+          },
           { header: "Section", cell: (r) => r.section ?? "—" },
           { header: "Student SRM Mail", cell: (r) => r.email ?? "—" },
           { header: "Status", cell: (r) => <Badge tone={STATUS_TONE[r.status]}>{CLASS_STATUS_LABEL[r.status]}</Badge> },
