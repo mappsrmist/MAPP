@@ -4,7 +4,8 @@ import * as React from "react";
 import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Skeleton } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 
@@ -146,6 +147,11 @@ export function PersonDetailsDialog({ person, onClose }: { person: PersonRef | n
               <Button variant="outline" onClick={() => setArmed(false)} disabled={busy}>Cancel</Button>
               <Button variant="destructive" loading={busy} onClick={() => void resetPassword()}>Yes, reset</Button>
             </>
+          )}
+          {data && !armed && person && (
+            <Link href={`/admin/${kind === "student" ? "students" : "faculty"}/${person.id}`} className={buttonVariants({ variant: "outline" })}>
+              Full details &amp; team
+            </Link>
           )}
           {!armed && <Button onClick={onClose}>Close</Button>}
         </DialogFooter>
